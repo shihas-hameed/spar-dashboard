@@ -153,7 +153,58 @@ table.dt td.zero{color:#1e1e1e;}
 #tt-t{font-size:9px;color:#4a5a6a;margin-bottom:2px;letter-spacing:.5px;text-transform:uppercase;}
 #tt-v{font-size:13px;font-weight:700;}
 
-/* ── RESPONSIVE ── */
+/* ── PO DETAIL MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;transition:opacity .2s;pointer-events:none;}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{background:#0d0d0d;border:1px solid #2a2a2a;border-radius:14px;width:100%;max-width:620px;max-height:92vh;overflow-y:auto;transform:translateY(24px);transition:transform .25s cubic-bezier(.23,1,.32,1);box-shadow:0 32px 80px rgba(0,0,0,.9);}
+.modal-overlay.open .modal{transform:translateY(0);}
+
+/* Modal top bar */
+.modal-topbar{background:#000;padding:14px 18px;border-radius:14px 14px 0 0;border-bottom:2px solid #00e5a0;display:flex;align-items:center;justify-content:space-between;}
+.modal-topbar-left{display:flex;align-items:center;gap:14px;}
+.modal-po-badge{background:#00e5a0;color:#080808;font-size:11px;font-weight:800;padding:3px 10px;border-radius:4px;letter-spacing:1px;}
+.modal-po-num{font-size:20px;font-weight:800;color:#fff;letter-spacing:1px;}
+.modal-po-date{font-size:11px;color:#4a5a6a;margin-top:2px;}
+.modal-close{width:28px;height:28px;border-radius:50%;border:1px solid #2a2a2a;background:#1a1a1a;color:#6b7a8d;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.modal-close:hover{background:#ff6b35;color:#fff;border-color:#ff6b35;}
+
+/* Two-column supplier/deliver section */
+.modal-header-grid{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #1a1a1a;}
+.modal-col{padding:14px 16px;}
+.modal-col:first-child{border-right:1px solid #1a1a1a;}
+.modal-col-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#00e5a0;font-weight:700;margin-bottom:10px;}
+.modal-inf{display:flex;flex-direction:column;gap:5px;}
+.modal-inf-row{display:flex;gap:8px;font-size:11px;}
+.modal-inf-key{color:#4a5a6a;min-width:80px;flex-shrink:0;}
+.modal-inf-val{color:#d0d8e8;font-weight:600;}
+
+/* Line items table */
+.modal-items{padding:14px 16px;border-bottom:1px solid #1a1a1a;}
+.modal-items-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#4a5a6a;font-weight:700;margin-bottom:8px;}
+table.po-tbl{width:100%;border-collapse:collapse;font-size:11px;}
+table.po-tbl thead th{background:#141414;color:#6b7a8d;padding:6px 8px;text-align:left;font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:600;}
+table.po-tbl thead th:last-child,table.po-tbl thead th:nth-last-child(2){text-align:right;}
+table.po-tbl tbody td{padding:7px 8px;border-bottom:1px solid #141414;color:#c0c8d8;vertical-align:top;}
+table.po-tbl tbody td:last-child,table.po-tbl tbody td:nth-last-child(2){text-align:right;}
+table.po-tbl tfoot td{padding:7px 8px;font-size:12px;}
+.po-total-row td{border-top:2px solid #2a2a2a;font-weight:800;color:#ff6b35 !important;font-size:14px !important;}
+
+/* Footer row */
+.modal-footer{display:grid;grid-template-columns:1fr 1fr;padding:12px 16px;gap:12px;background:#0a0a0a;border-radius:0 0 14px 14px;}
+.modal-footer-field{display:flex;flex-direction:column;gap:3px;}
+.modal-footer-label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#4a5a6a;font-weight:700;}
+.modal-footer-val{font-size:11px;font-weight:600;color:#d0d8e8;}
+
+/* Google Drive button */
+.modal-doc{margin:0 16px 14px;padding:12px;background:#0a1628;border:1px solid #1e3a5f;border-radius:8px;}
+.modal-doc-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px;background:#1e3a5f;border:1px solid #3b5f8a;border-radius:7px;color:#93c5fd;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;transition:all .15s;font-family:inherit;}
+.modal-doc-btn:hover{background:#2d5a8a;color:#fff;border-color:#60a5fa;}
+.modal-doc-none{font-size:11px;color:#2a3a4a;text-align:center;padding:6px 0;}
+.modal-doc-hint{font-size:10px;color:#2a3a4a;margin-top:6px;text-align:center;line-height:1.6;}
+
+.lpo-link{color:#00e5a0;cursor:pointer;text-decoration:underline;text-underline-offset:2px;font-weight:700;}
+.lpo-link:hover{color:#fff;}
+
 @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr);}.kpi-row2{grid-template-columns:repeat(2,1fr);}.grid2,.grid3,.grid4{grid-template-columns:1fr;}}
 @media(max-width:600px){.kpi-grid{grid-template-columns:repeat(2,1fr);}.kpi-row2{grid-template-columns:repeat(2,1fr);}.page{padding:0 10px 60px;}.filters{gap:5px;padding:10px;}.fdiv{display:none;}.fl{display:none;}}
 </style>
@@ -347,6 +398,95 @@ table.dt td.zero{color:#1e1e1e;}
 </div>
 
 </div><!-- /page -->
+
+<!-- PO DETAIL MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modalBox">
+
+    <!-- TOP BAR -->
+    <div class="modal-topbar">
+      <div class="modal-topbar-left">
+        <span class="modal-po-badge">PURCHASE ORDER</span>
+        <div>
+          <div class="modal-po-num" id="mLpo">LPO #—</div>
+          <div class="modal-po-date" id="mDate">—</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span id="mStatus"></span>
+        <button class="modal-close" onclick="closeModalBtn()">✕</button>
+      </div>
+    </div>
+
+    <!-- ORDER ON / DELIVER TO -->
+    <div class="modal-header-grid">
+      <div class="modal-col">
+        <div class="modal-col-title">Order On</div>
+        <div class="modal-inf">
+          <div class="modal-inf-row"><span class="modal-inf-key">Supplier</span><span class="modal-inf-val" id="mVendor">—</span></div>
+          <div class="modal-inf-row"><span class="modal-inf-key">Branch</span><span class="modal-inf-val" id="mStore">—</span></div>
+          <div class="modal-inf-row"><span class="modal-inf-key">Category</span><span class="modal-inf-val" id="mCat">—</span></div>
+          <div class="modal-inf-row"><span class="modal-inf-key">Payment</span><span class="modal-inf-val" id="mPayment">—</span></div>
+        </div>
+      </div>
+      <div class="modal-col">
+        <div class="modal-col-title">Deliver To</div>
+        <div class="modal-inf">
+          <div class="modal-inf-row"><span class="modal-inf-key">Company</span><span class="modal-inf-val">SPAR Retail W.L.L.</span></div>
+          <div class="modal-inf-row"><span class="modal-inf-key">P.O. Box</span><span class="modal-inf-val">490, Doha</span></div>
+          <div class="modal-inf-row"><span class="modal-inf-key">Tel.</span><span class="modal-inf-val">44562141</span></div>
+          <div class="modal-inf-row"><span class="modal-inf-key">Attn.</span><span class="modal-inf-val">Finance Controller</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LINE ITEMS -->
+    <div class="modal-items">
+      <div class="modal-items-title">Scope of Work / Description</div>
+      <table class="po-tbl">
+        <thead>
+          <tr>
+            <th style="width:30px">No.</th>
+            <th>Description</th>
+            <th style="width:60px">Qty</th>
+            <th style="width:90px">Unit Price</th>
+            <th style="width:90px">Total</th>
+          </tr>
+        </thead>
+        <tbody id="mItems"></tbody>
+        <tfoot>
+          <tr class="po-total-row">
+            <td colspan="4" style="text-align:right;color:#6b7a8d;font-size:11px;font-weight:600">TOTAL AMOUNT</td>
+            <td id="mAmt" style="text-align:right;">—</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- GOOGLE DRIVE DOCUMENT -->
+    <div class="modal-doc">
+      <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#60a5fa;font-weight:700;margin-bottom:8px;">📎 PO Document — Google Drive</div>
+      <div id="mDocArea"></div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="modal-footer">
+      <div class="modal-footer-field">
+        <div class="modal-footer-label">Invoice Instructions</div>
+        <div class="modal-footer-val" style="font-size:10px;color:#4a5a6a;line-height:1.6;">Prepare invoice in the name of<br><strong style="color:#d0d8e8">SPAR Retail W.L.L (HO)</strong><br>P.O. Box 490, Doha · Attn: Finance Manager</div>
+      </div>
+      <div class="modal-footer-field">
+        <div class="modal-footer-label">Approvals Required</div>
+        <div class="modal-footer-val" style="font-size:10px;color:#4a5a6a;line-height:1.7;">
+          Line Manager &nbsp;·&nbsp; Operations Manager<br>
+          Finance: Accounting Manager<br>
+          <span id="mApproval" style="color:#ffd166"></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
 <div id="tt"><div id="tt-t"></div><div id="tt-v"></div></div>
 
 <script>
@@ -784,8 +924,8 @@ function renderLPOs(){
   document.getElementById('lpoSub').textContent=`${tot} records · page ${lpoPage+1} of ${pages}`;
   document.getElementById('lInfo').textContent=`${tot} records · page ${lpoPage+1}/${pages}`;
   document.getElementById('lTbody').innerHTML=sl.map(r=>`
-    <tr>
-      <td class="tl" style="color:#3a4a5a;font-size:10px">${r.lpo}</td>
+    <tr onclick="openModal(${r.lpo})" style="cursor:pointer;">
+      <td class="tl"><span class="lpo-link">${r.lpo}</span></td>
       <td class="tl" style="font-weight:700">${r.vendor||'—'}</td>
       <td class="tl" style="color:${STORE_C[r.store]||'#d0d8e8'};font-weight:600">${r.store||'—'}</td>
       <td class="tl" style="color:${catColor(r.category)};font-size:10px;font-weight:600">${r.category}</td>
@@ -808,8 +948,85 @@ document.addEventListener('mousemove',e=>{if(ttEl.classList.contains('v'))mv(e);
 document.addEventListener('touchstart',()=>ht(),{passive:true});
 
 /* ═══════════════════════════════════════════
-   REBUILD
+   PO DETAIL MODAL
 ═══════════════════════════════════════════ */
+function openModal(lpoNum){
+  const r = RAW.find(x => x.lpo == lpoNum);
+  if(!r) return;
+
+  // Top bar
+  document.getElementById('mLpo').textContent = 'LPO #' + r.lpo;
+  document.getElementById('mDate').textContent = r.year ? 'Order Year: ' + r.year : '—';
+  document.getElementById('mStatus').innerHTML =
+    `<span class="${r.inv==='PENDING'?'badge-pend':'badge-ok'}">${r.inv==='PENDING'?'⚠ PENDING':'✓ SUBMITTED'}</span>`;
+
+  // Supplier / branch info
+  document.getElementById('mVendor').textContent  = r.vendor || '—';
+  document.getElementById('mStore').innerHTML     = `<span style="color:${STORE_C[r.store]||'#d0d8e8'};font-weight:700">${r.store||'—'}</span>`;
+  document.getElementById('mCat').innerHTML       = `<span style="color:${catColor(r.category)}">${r.category||'—'}</span>`;
+  document.getElementById('mPayment').textContent = r.payment || '—';
+
+  // Line item — one row from Excel data
+  document.getElementById('mItems').innerHTML = `
+    <tr>
+      <td style="color:#4a5a6a">1</td>
+      <td style="color:#f0f0f0;font-weight:500;line-height:1.5">${r.description||'No description'}</td>
+      <td>1</td>
+      <td style="color:#d0d8e8">${r.amt?r.amt.toLocaleString('en-QA',{minimumFractionDigits:2}):'—'}</td>
+      <td style="color:#ff6b35;font-weight:700">${r.amt?r.amt.toLocaleString('en-QA',{minimumFractionDigits:2}):'—'}</td>
+    </tr>`;
+
+  // Total
+  document.getElementById('mAmt').innerHTML =
+    `<span style="color:#ff6b35;font-weight:800;font-size:15px">${fmtQ(r.amt)}</span>`;
+
+  // Approval level note based on amount
+  const approvalEl = document.getElementById('mApproval');
+  if(r.amt <= 10000)      approvalEl.textContent = 'GM / Business Head (Up to 10K QAR)';
+  else if(r.amt <= 50000) approvalEl.textContent = 'Operations Manager (Up to 50K QAR)';
+  else                    approvalEl.textContent = 'Senior Management Approval Required';
+
+  // Google Drive link
+  const docArea = document.getElementById('mDocArea');
+  if(r.po_link && r.po_link.trim() !== '') {
+    let link = r.po_link.trim();
+    const driveMatch = link.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if(driveMatch) link = `https://drive.google.com/file/d/${driveMatch[1]}/view`;
+    docArea.innerHTML = `
+      <a href="${link}" target="_blank" rel="noopener" class="modal-doc-btn">
+        📄 &nbsp; Open PO Document in Google Drive
+      </a>
+      <div class="modal-doc-hint" style="color:#2a4a6a;font-size:10px;text-align:center;margin-top:6px;">Opens in a new tab &mdash; sign in to Google Drive if prompted</div>`;
+  } else {
+    docArea.innerHTML = `
+      <div class="modal-doc-none">No document attached yet</div>
+      <div class="modal-doc-hint">
+        To attach: Upload PO PDF to Google Drive → Right-click → <strong style="color:#3b5f8a">Get shareable link</strong>
+        → Paste in <strong style="color:#3b5f8a">PO LINK</strong> column in Excel → Run update_dashboard.py
+      </div>`;
+  }
+
+  // Open
+  const overlay = document.getElementById('modalOverlay');
+  overlay.style.display = 'flex';
+  requestAnimationFrame(()=>overlay.classList.add('open'));
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModalBtn(){
+  const overlay = document.getElementById('modalOverlay');
+  overlay.classList.remove('open');
+  setTimeout(()=>{ overlay.style.display='none'; document.body.style.overflow=''; }, 200);
+}
+
+function closeModal(e){
+  if(e.target === document.getElementById('modalOverlay')) closeModalBtn();
+}
+
+// Close on Escape key
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModalBtn(); });
+
+
 function rebuild(){
   buildKpi1();
   buildKpi2();
