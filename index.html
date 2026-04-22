@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="description" content="SPAR Qatar LPO Intelligence Dashboard — Procurement analytics by store, vendor and category">
+<meta name="theme-color" content="#0f172a">
+<!-- Open Graph — shows preview when link is shared on WhatsApp, Teams, email -->
+<meta property="og:title" content="SPAR Qatar — LPO Master Dashboard">
+<meta property="og:description" content="485 LPOs · QAR 1.99M · 44 Vendors · Filter by Store, Year & Category">
+<meta property="og:type" content="website">
+<title>SPAR Qatar — LPO Master Dashboard</title>
+<style>
+/* OFFLINE SAFE — no external dependencies */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  background:#0a0a0a;
+  color:#f0f0f0;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  font-size:14px;
+  min-height:100vh;
+}
+
+/* PAGE */
+.page{max-width:1400px;margin:0 auto;padding:0 16px 60px;}
+
+/* HEADER */
+header{
+  background:#000000;
+  color:#fff;padding:16px 24px 16px;margin-bottom:20px;
+  border-radius:0 0 16px 16px;
+  border-bottom:3px solid #00e5a0;
+}
+.hrow{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.hbrand{display:flex;align-items:center;gap:16px;}
+.badge{background:#00e5a0;color:#f0f0f0;font-weight:800;font-size:16px;letter-spacing:1px;padding:5px 12px;border-radius:6px;}
+h1{font-size:clamp(18px,3vw,28px);font-weight:700;letter-spacing:1px;color:#fff;}
+.hsub{font-size:11px;color:#556070;margin-top:3px;}
+.hright{text-align:right;}
+.hpill{display:inline-flex;align-items:center;gap:5px;background:rgba(0,229,160,0.15);color:#00e5a0;font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid rgba(0,229,160,0.3);margin-bottom:4px;}
+.hpill-dot{width:6px;height:6px;border-radius:50%;background:#00e5a0;animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hmeta{font-size:11px;color:#556070;}
+
+/* FILTERS */
+.filters{
+  background:#141414;border:1px solid #2a2a2a;border-radius:12px;
+  padding:14px 16px;margin-bottom:20px;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+}
+.fl{font-size:10px;color:#6b7a8d;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;flex-shrink:0;}
+.btn-g{display:flex;gap:3px;flex-wrap:wrap;}
+.fb{
+  padding:5px 12px;border-radius:6px;border:1px solid #2a2a2a;
+  background:#141414;color:#6b7a8d;font-size:11px;cursor:pointer;
+  transition:all .15s;font-weight:500;
+}
+.fb.on{background:#0f172a;color:#fff;border-color:#f0f0f0;font-weight:600;}
+.fb:not(.on):hover{border-color:#f0f0f0;color:#f0f0f0;}
+.fdiv{width:1px;height:24px;background:#e2e8f0;flex-shrink:0;margin:0 4px;}
+
+/* SECTION LABEL */
+.sec{
+  font-size:10px;letter-spacing:2.5px;text-transform:uppercase;
+  color:#6b7a8d;font-weight:700;
+  margin-bottom:12px;margin-top:20px;
+  display:flex;align-items:center;gap:8px;
+}
+.sec::after{content:'';flex:1;height:1px;background:#2a2a2a;}
+
+/* KPI STRIP */
+.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:4px;}
+.kc{
+  background:#141414;border:1px solid #2a2a2a;border-radius:12px;
+  padding:16px 14px;position:relative;overflow:hidden;
+  transition:transform .15s,box-shadow .15s;
+}
+.kc:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.08);}
+.kc-bar{position:absolute;top:0;left:0;right:0;height:3px;border-radius:12px 12px 0 0;}
+.kc-lbl{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#556070;margin-bottom:8px;font-weight:600;}
+.kc-val{font-size:clamp(18px,2.2vw,26px);font-weight:800;line-height:1.1;margin-bottom:3px;}
+.kc-sub{font-size:10px;color:#556070;}
+
+/* CARDS */
+.grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:14px;}
+.card{background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:20px;}
+.card-title{font-size:13px;font-weight:700;margin-bottom:2px;color:#f0f0f0;}
+.card-sub{font-size:11px;color:#556070;margin-bottom:16px;}
+
+/* HORIZONTAL BAR */
+.hbar-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.hbar-lbl{font-size:11px;font-weight:600;width:80px;text-align:right;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#d0d8e8;}
+.hbar-track{flex:1;background:#1f1f1f;border-radius:4px;height:22px;overflow:hidden;}
+.hbar-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-size:10px;font-weight:600;white-space:nowrap;transition:width 0.8s ease;min-width:4px;color:rgba(15,23,42,.85);}
+.hbar-val{font-size:10px;color:#6b7a8d;width:48px;flex-shrink:0;font-weight:500;}
+
+/* STACKED BAR */
+.sbar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.sbar-lbl{font-size:11px;font-weight:700;width:66px;text-align:right;flex-shrink:0;color:#d0d8e8;}
+.sbar-track{flex:1;display:flex;border-radius:5px;overflow:hidden;height:26px;}
+.sbar-seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;overflow:hidden;white-space:nowrap;transition:opacity .15s;min-width:0;}
+.sbar-seg:hover{opacity:.8;}
+.sbar-tot{font-size:10px;font-weight:600;color:#8899aa;width:48px;flex-shrink:0;}
+
+/* DONUT */
+.donut-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;}
+.leg-item{display:flex;align-items:center;justify-content:space-between;font-size:11px;padding:3px 0;}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.leg-lbl{flex:1;margin-left:8px;color:#d0d8e8;font-weight:500;}
+.leg-pct{color:#6b7a8d;font-size:10px;font-weight:600;}
+
+/* VENDOR TABLE */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+table.dt{border-collapse:collapse;width:100%;min-width:580px;}
+table.dt thead th{
+  font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
+  color:#556070;padding:8px 10px;text-align:right;
+  border-bottom:2px solid #2a2a2a;white-space:nowrap;font-weight:600;
+  background:#1a1a1a;
+}
+table.dt thead th.tl{text-align:left;}
+table.dt tbody tr{border-bottom:1px solid #1f1f1f;transition:background .1s;}
+table.dt tbody tr:hover{background:#1a1a1a;}
+table.dt tbody tr.totrow{border-top:2px solid #2a2a2a;background:#1a1a1a;font-weight:700;}
+table.dt td{padding:8px 10px;text-align:right;font-size:11px;color:#d0d8e8;}
+table.dt td.tl{text-align:left;font-size:12px;font-weight:600;color:#f0f0f0;}
+table.dt td.zero{color:#252525;}
+.vbar-mini{height:3px;border-radius:2px;background:#00e5a0;margin-top:3px;transition:width .8s ease;}
+.rank{font-size:14px;font-weight:800;color:#556070;text-align:center;}
+.rank.top{color:#f0f0f0;}
+
+/* SEARCH */
+.search-box{position:relative;margin-bottom:14px;}
+.search-box input{
+  width:100%;padding:9px 12px 9px 34px;
+  background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;
+  color:#f0f0f0;font-size:12px;outline:none;
+  font-family:inherit;
+}
+.search-box input:focus{border-color:#f0f0f0;background:#141414;}
+.search-box input::placeholder{color:#556070;}
+.sico{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#556070;font-size:14px;}
+
+/* PAGER */
+.pager{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:11px;color:#6b7a8d;flex-wrap:wrap;gap:8px;}
+.pager button{
+  padding:5px 14px;border-radius:6px;border:1px solid #2a2a2a;
+  background:#141414;color:#d0d8e8;cursor:pointer;font-size:11px;
+  font-family:inherit;font-weight:600;
+}
+.pager button:hover{background:#0f172a;color:#fff;border-color:#f0f0f0;}
+
+/* STATUS BADGE */
+.badge-ok{display:inline-block;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;background:#052e16;color:#4ade80;}
+.badge-pend{display:inline-block;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;background:#2d0a0a;color:#f87171;}
+
+/* TOOLTIP */
+#tt{
+  position:fixed;z-index:9999;pointer-events:none;opacity:0;
+  transition:opacity .12s;
+  background:#1a1a1a;color:#f0f0f0;border:1px solid #2a2a2a;
+  border-radius:8px;padding:8px 12px;font-size:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.25);white-space:nowrap;
+  max-width:260px;
+}
+#tt.v{opacity:1;}
+#tt-t{font-size:10px;color:#556070;margin-bottom:2px;letter-spacing:.5px;}
+#tt-v{font-size:14px;font-weight:700;}
+
+/* MOBILE RESPONSIVE */
+@media(max-width:1000px){
+  .kpi-row{grid-template-columns:repeat(3,1fr);}
+  .grid2{grid-template-columns:1fr;}
+}
+@media(max-width:600px){
+  .kpi-row{grid-template-columns:repeat(2,1fr);}
+  .page{padding:0 10px 50px;}
+  .filters{gap:6px;padding:10px 12px;}
+  .fb{padding:4px 8px;font-size:10px;}
+  .fdiv{display:none;}
+  .fl{display:none;}
+  h1{font-size:18px;}
+  .kc{padding:12px 10px;}
+  .kc-val{font-size:20px;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- LOADING BANNER -->
+<div id="loadingBanner" style="display:flex;align-items:center;justify-content:center;gap:12px;
+  padding:16px;background:#0a1628;border:1px solid #1e3a5f;border-radius:10px;margin-bottom:16px;">
+  <div style="width:18px;height:18px;border:2px solid #00e5a0;border-top-color:transparent;
+    border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;"></div>
+  <span style="color:#60a5fa;font-size:13px;font-weight:500;">Loading live data from GitHub&hellip;</span>
+</div>
+<!-- ERROR BANNER -->
+<div id="errorBanner" style="display:none;align-items:center;gap:12px;
+  padding:16px;background:#1a0505;border:1px solid #7f1d1d;border-radius:10px;margin-bottom:16px;">
+  <span style="font-size:20px;">⚠️</span>
+  <div>
+    <div style="color:#f87171;font-weight:700;font-size:13px;">Dashboard data could not load</div>
+    <div id="errorMsg" style="color:#6b7280;font-size:11px;margin-top:3px;"></div>
+    <div style="color:#6b7280;font-size:11px;margin-top:3px;">
+      Make sure <strong style="color:#d0d8e8">data.json</strong> is in the same GitHub repo folder as index.html.
+      Run <strong style="color:#d0d8e8">update_dashboard.py</strong> to generate it.
+    </div>
+  </div>
+</div>
+<!-- HEADER -->
+<header>
+  <div class="hrow">
+    <div class="hbrand">
+      <img src="data:image/png;base64,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"
+           alt="SPAR Logo"
+           style="height:72px;width:auto;display:block;flex-shrink:0;">
+      <div style="border-left:2px solid #2a2a2a;padding-left:18px;margin-left:4px;">
+        <h1>LPO Master Dashboard</h1>
+        <div class="hsub">Procurement Intelligence &mdash; Vendor &middot; Store &middot; Category &middot; Year</div>
+        <div class="hsub" style="color:#00e5a0;margin-top:2px;font-size:10px;">QATAR OPERATIONS</div>
+      </div>
+    </div>
+    <div class="hright">
+      <div class="hpill"><span class="hpill-dot"></span>LIVE DATA</div>
+      <div class="hmeta" id="hMeta">Loading&hellip;</div>
+      <div class="hmeta" id="lastUpdated" style="margin-top:3px;color:#00e5a0;font-size:10px;"></div>
+    </div>
+  </div>
+</header>
+
+<!-- FILTERS -->
+<div class="filters">
+  <span class="fl">Year</span>
+  <div class="btn-g" id="yrBtns">
+    <button class="fb on" onclick="setF('year','all',this)">All</button>
+    <button class="fb" onclick="setF('year',2023,this)">2023</button>
+    <button class="fb" onclick="setF('year',2024,this)">2024</button>
+    <button class="fb" onclick="setF('year',2025,this)">2025</button>
+    <button class="fb" onclick="setF('year',2026,this)">2026</button>
+  </div>
+  <div class="fdiv"></div>
+  <span class="fl">Store</span>
+  <div class="btn-g" id="stBtns">
+    <button class="fb on" onclick="setF('store','all',this)">All</button>
+    <button class="fb" onclick="setF('store','TAWAR',this)">TAWAR</button>
+    <button class="fb" onclick="setF('store','PA',this)">PA</button>
+    <button class="fb" onclick="setF('store','QQ',this)">QQ</button>
+    <button class="fb" onclick="setF('store','Z3',this)">Z3</button>
+    <button class="fb" onclick="setF('store','ALM',this)">ALM</button>
+    <button class="fb" onclick="setF('store','ALJ',this)">ALJ</button>
+    <button class="fb" onclick="setF('store','BS',this)">BS</button>
+  </div>
+  <div class="fdiv"></div>
+  <span class="fl">Category</span>
+  <div class="btn-g" id="catBtns">
+    <button class="fb on" onclick="setF('cat','all',this)">All</button>
+    <button class="fb" onclick="setF('cat','Refrigeration Maint.',this)">Refrig.</button>
+    <button class="fb" onclick="setF('cat','Procurement',this)">Procure.</button>
+    <button class="fb" onclick="setF('cat','Civil Works',this)">Civil</button>
+    <button class="fb" onclick="setF('cat','Equipment Maint.',this)">Equip.</button>
+    <button class="fb" onclick="setF('cat','Fire &amp; Safety',this)">Fire</button>
+    <button class="fb" onclick="setF('cat','Signage &amp; Branding',this)">Signage</button>
+    <button class="fb" onclick="setF('cat','General Maint.',this)">General</button>
+  </div>
+</div>
+
+<!-- KPIs -->
+<div class="sec">Key Performance Indicators</div>
+<div class="kpi-row" id="kpiRow"></div>
+
+<!-- STORE + DONUT -->
+<div class="sec">Spend by Store &amp; Category</div>
+<div class="grid2">
+  <div class="card">
+    <div class="card-title">Store-wise Total Spend</div>
+    <div class="card-sub">QAR value per store — filtered view</div>
+    <div id="storeBars"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Category Breakdown</div>
+    <div class="card-sub">Work nature distribution</div>
+    <div class="donut-wrap">
+      <svg id="catDonut" width="150" height="150" viewBox="0 0 150 150" style="overflow:visible;display:block;"></svg>
+      <div id="catLeg" style="width:100%;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- STACKED -->
+<div class="grid2">
+  <div class="card">
+    <div class="card-title">Store × Category Mix</div>
+    <div class="card-sub">Proportional spend breakdown per store</div>
+    <div id="stackedBars"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Year-on-Year by Category</div>
+    <div class="card-sub">Spend composition per year</div>
+    <div id="yrBars"></div>
+  </div>
+</div>
+
+<!-- VENDOR TABLE -->
+<div class="sec">Vendor Intelligence</div>
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-title">All Vendors — LPO Count &amp; Total Value by Category</div>
+  <div class="card-sub">Ranked by total spend &middot; <span id="vcnt">44</span> vendors shown</div>
+  <div class="search-box">
+    <span class="sico">&#9906;</span>
+    <input id="vSearch" placeholder="Search vendor name..." oninput="renderVendors()">
+  </div>
+  <div class="tbl-wrap">
+    <table class="dt">
+      <thead><tr>
+        <th style="width:30px">#</th>
+        <th class="tl">Vendor</th>
+        <th>LPOs</th>
+        <th style="color:#06b6d4">Refrig.</th>
+        <th style="color:#7b61ff">Procure.</th>
+        <th style="color:#ff6b35">Civil</th>
+        <th style="color:#00b37a">Equip.</th>
+        <th style="color:#ef4444">Fire</th>
+        <th style="color:#d4a800">Signage</th>
+        <th style="color:#64748b">General</th>
+        <th style="color:#f0f0f0;font-weight:800">TOTAL</th>
+        <th>Avg/LPO</th>
+      </tr></thead>
+      <tbody id="vTbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MATRIX TABLE -->
+<div class="sec">Store × Year × Category Spend Matrix</div>
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-title">Spend Matrix</div>
+  <div class="card-sub">Rows = stores &middot; click year/category filters above to drill in</div>
+  <div class="tbl-wrap">
+    <table class="dt" id="matrixTbl"></table>
+  </div>
+</div>
+
+<!-- LPO RECORDS -->
+<div class="sec">LPO Transaction Records</div>
+<div class="card">
+  <div class="card-title">Individual LPO Detail</div>
+  <div class="card-sub" id="lpoSub">All records</div>
+  <div class="search-box">
+    <span class="sico">&#9906;</span>
+    <input id="lSearch" placeholder="Search LPO#, vendor, store, description..." oninput="lpoPage=0;renderLPOs()">
+  </div>
+  <div class="tbl-wrap">
+    <table class="dt">
+      <thead><tr>
+        <th class="tl">LPO #</th>
+        <th class="tl">Vendor</th>
+        <th class="tl">Store</th>
+        <th class="tl">Category</th>
+        <th>Year</th>
+        <th class="tl">Description</th>
+        <th>Amount</th>
+        <th>Invoice</th>
+      </tr></thead>
+      <tbody id="lTbody"></tbody>
+    </table>
+  </div>
+  <div class="pager">
+    <span id="lInfo">—</span>
+    <div style="display:flex;gap:6px;">
+      <button onclick="changePage(-1)">&#8592; Prev</button>
+      <button onclick="changePage(1)">Next &#8594;</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /page -->
+<div id="tt"><div id="tt-t"></div><div id="tt-v"></div></div>
+
+<script>
+/* ============================================================
+   DATA
+   ============================================================ */
+/* ── DATA LOADER ─────────────────────────────────────────────
+   Fetches data.json from GitHub (same folder as index.html).
+   Falls back to empty array with a clear error message.
+   ─────────────────────────────────────────────────────────── */
+let RAW = [];
+let DATA_META = { generated: null, total_records: 0 };
+
+async function loadData() {
+  const loading = document.getElementById('loadingBanner');
+  const error   = document.getElementById('errorBanner');
+  try {
+    loading.style.display = 'flex';
+    // Cache-busted fetch so we always get the latest data.json
+    const res = await fetch('data.json?v=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    RAW = json.records || [];
+    DATA_META = { generated: json.generated, total_records: json.total_records };
+    loading.style.display = 'none';
+    // Show last-updated time in header
+    if (json.generated) {
+      const d = new Date(json.generated);
+      document.getElementById('lastUpdated').textContent =
+        'Last updated: ' + d.toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) +
+        ' ' + d.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+    }
+    rebuild();
+  } catch(e) {
+    loading.style.display = 'none';
+    error.style.display = 'flex';
+    document.getElementById('errorMsg').textContent = 'Could not load data.json — ' + e.message;
+    console.error('Dashboard load error:', e);
+  }
+}
+
+/* ============================================================
+   CONFIG — all plain hex, NO CSS vars in JS
+   ============================================================ */
+const CATS = [
+  {k:'Refrigeration Maint.', l:'Refrig.',   c:'#06b6d4'},
+  {k:'Procurement',          l:'Procure.',  c:'#7b61ff'},
+  {k:'Civil Works',          l:'Civil',     c:'#ff6b35'},
+  {k:'Equipment Maint.',     l:'Equip.',    c:'#00b37a'},
+  {k:'General Maint.',       l:'General',   c:'#64748b'},
+  {k:'Signage & Branding',   l:'Signage',   c:'#d4a800'},
+  {k:'Fire & Safety',        l:'Fire',      c:'#ef4444'}
+];
+const STORES = ['TAWAR','PA','QQ','Z3','ALM','ALJ','BS'];
+const SC = {TAWAR:'#0f172a',PA:'#7b61ff',QQ:'#059669',Z3:'#ea580c',ALM:'#ca8a04',ALJ:'#db2777',BS:'#dc2626'};
+const YC = {2023:'#7b61ff',2024:'#0891b2',2025:'#059669',2026:'#ea580c'};
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let fY='all', fS='all', fC='all', lpoPage=0;
+const PG=25;
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function filtered(){
+  return RAW.filter(r=>
+    r.vendor && r.store && r.store!=='nan' &&
+    (fY==='all'||r.year===fY) &&
+    (fS==='all'||r.store===fS) &&
+    (fC==='all'||r.category===fC)
+  );
+}
+function setF(t,v,btn){
+  if(t==='year'){fY=v;document.querySelectorAll('#yrBtns .fb').forEach(b=>b.classList.remove('on'));}
+  if(t==='store'){fS=v;document.querySelectorAll('#stBtns .fb').forEach(b=>b.classList.remove('on'));}
+  if(t==='cat'){fC=v;document.querySelectorAll('#catBtns .fb').forEach(b=>b.classList.remove('on'));}
+  btn.classList.add('on');
+  lpoPage=0;
+  rebuild();
+}
+function fmtQ(v){
+  if(!v)return 'QAR 0';
+  if(v>=1000000)return 'QAR '+(v/1000000).toFixed(2)+'M';
+  if(v>=1000)return 'QAR '+Math.round(v/1000)+'K';
+  return 'QAR '+Math.round(v);
+}
+function fmtS(v){
+  if(!v||v<1)return '—';
+  if(v>=1000000)return (v/1000000).toFixed(1)+'M';
+  if(v>=1000)return Math.round(v/1000)+'K';
+  return Math.round(v)+'';
+}
+function txtColor(hex){
+  // returns black or white depending on bg brightness
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return (r*299+g*587+b*114)/1000>128?'#0f172a':'#ffffff';
+}
+
+/* ============================================================
+   KPIs
+   ============================================================ */
+function buildKpi(){
+  const d=filtered();
+  const total=d.reduce((s,r)=>s+r.amt,0);
+  const vendors=[...new Set(d.map(r=>r.vendor))].length;
+  const pending=d.filter(r=>r.inv==='PENDING').length;
+  const avg=d.length?total/d.length:0;
+  const topSt=STORES.map(s=>({s,v:d.filter(r=>r.store===s).reduce((x,r)=>x+r.amt,0)})).sort((a,b)=>b.v-a.v)[0];
+  const topVen=[...new Set(d.map(r=>r.vendor))].map(v=>({v,t:d.filter(r=>r.vendor===v).reduce((x,r)=>x+r.amt,0)})).sort((a,b)=>b.t-a.t)[0];
+  const items=[
+    {l:'Total LPO Value',v:fmtQ(total),s:d.length+' orders',c:'#0f172a'},
+    {l:'Vendors Active',v:vendors,s:'unique suppliers',c:'#7b61ff'},
+    {l:'Avg per LPO',v:fmtQ(avg),s:'per order',c:'#0891b2'},
+    {l:'Top Store',v:topSt?.s||'—',s:fmtQ(topSt?.v||0),c:'#ea580c'},
+    {l:'Top Vendor',v:(topVen?.v||'—').split(' ')[0],s:fmtQ(topVen?.t||0),c:'#059669'},
+    {l:'Pending Invoices',v:pending,s:((pending/Math.max(d.length,1))*100).toFixed(1)+'% of total',c:'#dc2626'}
+  ];
+  document.getElementById('kpiRow').innerHTML=items.map(i=>`
+    <div class="kc">
+      <div class="kc-bar" style="background:${i.c}"></div>
+      <div class="kc-lbl">${i.l}</div>
+      <div class="kc-val" style="color:${i.c}">${i.v}</div>
+      <div class="kc-sub">${i.s}</div>
+    </div>`).join('');
+  document.getElementById('hMeta').textContent=d.length+' LPOs · '+fmtQ(total)+' · '+vendors+' Vendors';
+}
+
+/* ============================================================
+   STORE BARS
+   ============================================================ */
+function buildStoreBars(){
+  const d=filtered();
+  const data=STORES.map(s=>({s,v:d.filter(r=>r.store===s).reduce((x,r)=>x+r.amt,0)})).sort((a,b)=>b.v-a.v);
+  const max=Math.max(...data.map(x=>x.v),1);
+  document.getElementById('storeBars').innerHTML=data.filter(x=>x.v>0).map(x=>`
+    <div class="hbar-row">
+      <div class="hbar-lbl" style="color:${SC[x.s]||'#334155'}">${x.s}</div>
+      <div class="hbar-track" onmousemove="tip(event,'${x.s}','${fmtQ(x.v)}')" onmouseleave="ht()">
+        <div class="hbar-fill" style="width:${(x.v/max*100).toFixed(1)}%;background:${SC[x.s]||'#334155'};color:#fff">
+          ${x.v>max*0.18?fmtS(x.v):''}
+        </div>
+      </div>
+      <div class="hbar-val">${x.v<=max*0.18?fmtS(x.v):''}</div>
+    </div>`).join('');
+}
+
+/* ============================================================
+   CATEGORY DONUT
+   ============================================================ */
+function buildDonut(){
+  const d=filtered();
+  const cats=CATS.map(c=>({...c,v:d.filter(r=>r.category===c.k).reduce((s,r)=>s+r.amt,0)}));
+  const total=cats.reduce((s,x)=>s+x.v,0)||1;
+  const svg=document.getElementById('catDonut');
+  const leg=document.getElementById('catLeg');
+  const cx=75,cy=75,R=58,ir=34;
+  let ang=-Math.PI/2;
+  svg.innerHTML='';
+  cats.filter(x=>x.v>0).forEach(x=>{
+    const a=(x.v/total)*2*Math.PI;
+    const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const x1=cx+R*Math.cos(ang),y1=cy+R*Math.sin(ang);
+    const x2=cx+R*Math.cos(ang+a),y2=cy+R*Math.sin(ang+a);
+    const ix1=cx+ir*Math.cos(ang),iy1=cy+ir*Math.sin(ang);
+    const ix2=cx+ir*Math.cos(ang+a),iy2=cy+ir*Math.sin(ang+a);
+    const lg=a>Math.PI?1:0;
+    p.setAttribute('d',`M${ix1},${iy1}L${x1},${y1}A${R},${R},0,${lg},1,${x2},${y2}L${ix2},${iy2}A${ir},${ir},0,${lg},0,${ix1},${iy1}Z`);
+    p.setAttribute('fill',x.c);p.style.cursor='pointer';
+    p.addEventListener('mousemove',e=>tip(e,x.l,fmtQ(x.v)+' ('+(x.v/total*100).toFixed(1)+'%)'));
+    p.addEventListener('mouseleave',ht);
+    svg.appendChild(p);ang+=a;
+  });
+  const makeT=(txt,y,sz,fill,bold)=>{
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',cx);t.setAttribute('y',y);t.setAttribute('text-anchor','middle');
+    t.setAttribute('fill',fill);t.setAttribute('font-size',sz);
+    t.setAttribute('font-family','-apple-system,BlinkMacSystemFont,sans-serif');
+    if(bold)t.setAttribute('font-weight','800');
+    t.textContent=txt;return t;
+  };
+  svg.appendChild(makeT(fmtS(total),cy+5,16,'#1a1f2e',true));
+  svg.appendChild(makeT('total QAR',cy+19,8,'#94a3b8',false));
+  leg.innerHTML=cats.filter(x=>x.v>0).map(x=>`
+    <div class="leg-item">
+      <span class="leg-dot" style="background:${x.c}"></span>
+      <span class="leg-lbl">${x.l}</span>
+      <span class="leg-pct">${(x.v/total*100).toFixed(0)}%</span>
+    </div>`).join('');
+}
+
+/* ============================================================
+   STACKED BARS
+   ============================================================ */
+function buildStacked(){
+  const d=filtered();
+  const max=Math.max(...STORES.map(s=>d.filter(r=>r.store===s).reduce((x,r)=>x+r.amt,0)),1);
+  document.getElementById('stackedBars').innerHTML=STORES.map(s=>{
+    const tot=d.filter(r=>r.store===s).reduce((x,r)=>x+r.amt,0);
+    if(!tot)return '';
+    const segs=CATS.map(c=>{
+      const v=d.filter(r=>r.store===s&&r.category===c.k).reduce((x,r)=>x+r.amt,0);
+      const pct=(v/tot*100).toFixed(1);
+      return v?`<div class="sbar-seg" style="width:${pct}%;background:${c.c};color:${txtColor(c.c)}"
+        onmousemove="tip(event,'${s} · ${c.l}','${fmtQ(v)}')" onmouseleave="ht()">${pct>10?fmtS(v):''}</div>`:'';
+    }).join('');
+    const w=(tot/max*100).toFixed(1);
+    return `<div class="sbar-row">
+      <div class="sbar-lbl" style="color:${SC[s]||'#334155'}">${s}</div>
+      <div style="flex:1;"><div class="sbar-track" style="width:${w}%;min-width:20px">${segs}</div></div>
+      <div class="sbar-tot">${fmtS(tot)}</div>
+    </div>`;
+  }).join('');
+}
+
+function buildYrBars(){
+  const d=filtered();
+  const yrs=[2023,2024,2025,2026];
+  const max=Math.max(...yrs.map(y=>d.filter(r=>r.year===y).reduce((s,r)=>s+r.amt,0)),1);
+  document.getElementById('yrBars').innerHTML=yrs.map(y=>{
+    const yr=d.filter(r=>r.year===y);
+    const tot=yr.reduce((s,r)=>s+r.amt,0);
+    if(!tot)return '';
+    const segs=CATS.map(c=>{
+      const v=yr.filter(r=>r.category===c.k).reduce((s,r)=>s+r.amt,0);
+      const pct=(v/tot*100).toFixed(1);
+      return v?`<div class="sbar-seg" style="width:${pct}%;background:${c.c};color:${txtColor(c.c)}"
+        onmousemove="tip(event,'${y} · ${c.l}','${fmtQ(v)}')" onmouseleave="ht()">${pct>12?fmtS(v):''}</div>`:'';
+    }).join('');
+    const w=(tot/max*100).toFixed(1);
+    return `<div class="sbar-row">
+      <div class="sbar-lbl" style="color:${YC[y]||'#334155'}">${y}</div>
+      <div style="flex:1;"><div class="sbar-track" style="width:${w}%;min-width:20px">${segs}</div></div>
+      <div class="sbar-tot">${fmtS(tot)}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ============================================================
+   VENDOR TABLE
+   ============================================================ */
+function renderVendors(){
+  const d=filtered();
+  const q=(document.getElementById('vSearch').value||'').toLowerCase();
+  let vs=[...new Set(d.map(r=>r.vendor))].map(v=>{
+    const rows=d.filter(r=>r.vendor===v);
+    const t=rows.reduce((s,r)=>s+r.amt,0);
+    const ct={};
+    CATS.forEach(c=>{ct[c.k]=rows.filter(r=>r.category===c.k).reduce((s,r)=>s+r.amt,0);});
+    return{v,n:rows.length,t,ct};
+  }).filter(x=>x.t>0&&(!q||x.v.toLowerCase().includes(q))).sort((a,b)=>b.t-a.t);
+  document.getElementById('vcnt').textContent=vs.length;
+  const mx=vs[0]?.t||1;
+  document.getElementById('vTbody').innerHTML=vs.map((x,i)=>`
+    <tr onmousemove="tip(event,'${x.v}','${fmtQ(x.t)} · ${x.n} LPOs')" onmouseleave="ht()">
+      <td class="rank ${i<3?'top':''}">${i+1}</td>
+      <td class="tl">
+        ${x.v}
+        <div class="vbar-mini" style="width:${(x.t/mx*100).toFixed(0)}%"></div>
+      </td>
+      <td style="font-weight:700">${x.n}</td>
+      ${CATS.map(c=>`<td class="${x.ct[c.k]?'':'zero'}" style="${x.ct[c.k]?'color:'+c.c+';font-weight:600':''}">${fmtS(x.ct[c.k])}</td>`).join('')}
+      <td style="font-weight:800;color:#0f172a">${fmtS(x.t)}</td>
+      <td style="color:#64748b">${fmtS(x.t/x.n)}</td>
+    </tr>`).join('');
+}
+
+/* ============================================================
+   MATRIX TABLE
+   ============================================================ */
+function buildMatrix(){
+  const d=filtered();
+  const yrs=fY==='all'?[2023,2024,2025,2026]:[fY];
+  const tbl=document.getElementById('matrixTbl');
+  let h='<thead><tr><th class="tl" style="background:#f8fafc">Store</th>';
+  yrs.forEach(y=>{
+    if(fY!=='all'){CATS.forEach(c=>{h+=`<th style="color:${c.c};background:#1a1a1a;font-size:8px">${c.l}</th>`;});}
+    h+=`<th style="color:${YC[y]||'#334155'};background:#1a1a1a;border-left:2px solid #e2e8f0">${y}</th>`;
+  });
+  h+=`<th style="color:#f0f0f0;background:#1e2535;border-left:2px solid #2a2a2a;font-size:10px">GRAND TOTAL</th></tr></thead><tbody>`;
+  STORES.forEach(s=>{
+    const sr=d.filter(r=>r.store===s);
+    const gd=sr.reduce((x,r)=>x+r.amt,0);
+    if(!gd)return;
+    h+=`<tr><td class="tl" style="color:${SC[s]||'#334155'};font-weight:700">${s}</td>`;
+    yrs.forEach(y=>{
+      if(fY!=='all'){CATS.forEach(c=>{
+        const v=sr.filter(r=>r.year===y&&r.category===c.k).reduce((x,r)=>x+r.amt,0);
+        h+=`<td class="${v?'':'zero'}" style="${v?'color:'+c.c+';font-weight:600':''}"
+          onmousemove="tip(event,'${s} · ${y} · ${c.l}','${fmtQ(v)}')" onmouseleave="ht()">${fmtS(v)}</td>`;
+      });}
+      const yt=sr.filter(r=>r.year===y).reduce((x,r)=>x+r.amt,0);
+      h+=`<td style="font-weight:700;color:${SC[s]||'#334155'};border-left:2px solid #2a2a2a;background:#f8fafc"
+        onmousemove="tip(event,'${s} ${y}','${fmtQ(yt)}')" onmouseleave="ht()">${fmtS(yt)||'—'}</td>`;
+    });
+    h+=`<td style="font-weight:800;font-size:13px;color:#f0f0f0;border-left:2px solid #2a2a2a;background:#e8f0fe">${fmtS(gd)}</td></tr>`;
+  });
+  // Total row
+  h+='<tr class="totrow"><td class="tl" style="font-size:11px;letter-spacing:1px;color:#0f172a">ALL STORES</td>';
+  yrs.forEach(y=>{
+    if(fY!=='all'){CATS.forEach(c=>{
+      const v=d.filter(r=>r.year===y&&r.category===c.k).reduce((x,r)=>x+r.amt,0);
+      h+=`<td style="${v?'color:'+c.c:''}">${fmtS(v)||'—'}</td>`;
+    });}
+    const yt=d.filter(r=>r.year===y).reduce((x,r)=>x+r.amt,0);
+    h+=`<td style="font-weight:800;border-left:2px solid #2a2a2a;background:#f0f4f8">${fmtS(yt)||'—'}</td>`;
+  });
+  const gt=d.reduce((x,r)=>x+r.amt,0);
+  h+=`<td style="font-weight:800;font-size:15px;border-left:2px solid #2a2a2a;background:#0a1628;color:#60a5fa">${fmtS(gt)}</td></tr></tbody>`;
+  tbl.innerHTML=h;
+}
+
+/* ============================================================
+   LPO RECORDS TABLE
+   ============================================================ */
+function renderLPOs(){
+  const q=(document.getElementById('lSearch').value||'').toLowerCase();
+  const d=filtered().filter(r=>!q||(r.vendor||'').toLowerCase().includes(q)||(r.store||'').toLowerCase().includes(q)||(r.category||'').toLowerCase().includes(q)||String(r.lpo).includes(q)||(r.description||'').toLowerCase().includes(q));
+  const tot=d.length, pages=Math.ceil(tot/PG)||1;
+  if(lpoPage>=pages)lpoPage=pages-1;
+  const sl=d.slice(lpoPage*PG,(lpoPage+1)*PG);
+  document.getElementById('lpoSub').textContent=tot+' records · page '+(lpoPage+1)+' of '+pages;
+  document.getElementById('lInfo').textContent=tot+' records · page '+(lpoPage+1)+'/'+pages;
+  const catC=k=>(CATS.find(c=>c.k===k)||{c:'#64748b'}).c;
+  document.getElementById('lTbody').innerHTML=sl.map(r=>`
+    <tr>
+      <td class="tl" style="color:#556070;font-size:11px">${r.lpo}</td>
+      <td class="tl" style="font-weight:700">${r.vendor||'—'}</td>
+      <td class="tl" style="color:${SC[r.store]||'#334155'};font-weight:600">${r.store||'—'}</td>
+      <td class="tl" style="color:${catC(r.category)};font-size:10px;font-weight:600">${r.category}</td>
+      <td style="color:${YC[r.year]||'#64748b'};font-weight:600">${r.year||'—'}</td>
+      <td class="tl" style="font-size:10px;color:#8899aa;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(r.description||'').substring(0,38)}</td>
+      <td style="font-weight:700;color:#0f172a">${fmtQ(r.amt)}</td>
+      <td><span class="${r.inv==='PENDING'?'badge-pend':'badge-ok'}">${r.inv==='PENDING'?'PENDING':'OK'}</span></td>
+    </tr>`).join('');
+}
+function changePage(d){lpoPage=Math.max(0,lpoPage+d);renderLPOs();}
+
+/* ============================================================
+   TOOLTIP
+   ============================================================ */
+const ttEl=document.getElementById('tt'),ttT=document.getElementById('tt-t'),ttV=document.getElementById('tt-v');
+function tip(e,title,val){ttT.textContent=title;ttV.textContent=val;ttEl.classList.add('v');mv(e);}
+function mv(e){
+  const x=Math.min(e.clientX+14,window.innerWidth-280);
+  const y=Math.max(e.clientY-44,4);
+  ttEl.style.left=x+'px';ttEl.style.top=y+'px';
+}
+function ht(){ttEl.classList.remove('v');}
+document.addEventListener('mousemove',e=>{if(ttEl.classList.contains('v'))mv(e);});
+document.addEventListener('touchstart',()=>ht(),{passive:true});
+
+/* ============================================================
+   INIT
+   ============================================================ */
+function rebuild(){
+  buildKpi();buildStoreBars();buildDonut();
+  buildStacked();buildYrBars();
+  renderVendors();buildMatrix();renderLPOs();
+}
+// Start — fetch live data
+loadData();
+</script>
+</body>
+</html>
