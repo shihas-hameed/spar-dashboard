@@ -320,6 +320,23 @@ table.po-tbl tfoot td{padding:7px 8px;font-size:12px;}
 <div class="sec">MTD &amp; YTD Performance</div>
 <div class="kpi-row2" id="kpiRow2"></div>
 
+<!-- MONTHLY EXPENDITURE SECTION -->
+<div class="sec">Monthly Expenditure Analysis</div>
+<div class="card" style="margin-bottom:14px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+    <div>
+      <div class="ct">Monthly Spend Breakdown</div>
+      <div class="cs" id="monthSumSub">Select a month above or view all months — showing spend, LPO count and top vendor</div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <span style="font-size:10px;color:#4a5a6a">View:</span>
+      <button class="mb on" id="mViewAll" onclick="setMonthView('all',this)">All Months</button>
+      <button class="mb" id="mViewSel" onclick="setMonthView('selected',this)">Selected Month Detail</button>
+    </div>
+  </div>
+  <div id="monthSummaryArea"></div>
+</div>
+
 <!-- ROW 3: Year comparison + Category donut -->
 <div class="sec">Year-on-Year Comparison &amp; Category Spend</div>
 <div class="grid2">
@@ -342,7 +359,7 @@ table.po-tbl tfoot td{padding:7px 8px;font-size:12px;}
 <div class="sec">Monthly Trend &amp; Category Analysis</div>
 <div class="grid2">
   <div class="card">
-    <div class="ct">Monthly Spend Trend — 2024 vs 2025</div>
+    <div class="ct">Monthly Spend Trend</div>
     <div class="cs">Month-by-month comparison — hover bars for values</div>
     <div id="monthlyTrend"></div>
   </div>
@@ -819,31 +836,48 @@ function buildYrCompare(){
 }
 
 /* ═══════════════════════════════════════════
-   MONTHLY TREND 2024 vs 2025
+   MONTHLY TREND — dynamic last 2 years
 ═══════════════════════════════════════════ */
 function buildMonthlyTrend(){
-  const wrap=document.getElementById('monthlyTrend');
-  const months=Array.from({length:12},(_,i)=>i+1);
-  const v24=months.map(m=>RAW.filter(r=>r.year===2024&&r.month===m).reduce((s,r)=>s+r.amt,0));
-  const v25=months.map(m=>RAW.filter(r=>r.year===2025&&r.month===m).reduce((s,r)=>s+r.amt,0));
-  const max=Math.max(...v24,...v25,1);
-  const H=80;
+  const wrap = document.getElementById('monthlyTrend');
+
+  // Auto-detect the 2 most recent years that have data
+  const allYears = [...new Set(RAW.filter(r=>r.year).map(r=>r.year))].sort((a,b)=>b-a);
+  const yr1 = allYears[0]; // most recent  e.g. 2026
+  const yr2 = allYears[1]; // previous     e.g. 2025
+
+  if(!yr1){ wrap.innerHTML='<div style="color:#3a4a5a;font-size:12px;text-align:center;padding:20px">No data available</div>'; return; }
+
+  const colors = { [yr1]:'#00e5a0', [yr2]:'#06b6d4' };
+  const months = Array.from({length:12},(_,i)=>i+1);
+
+  const v1 = months.map(m=>RAW.filter(r=>r.year===yr1&&r.month===m).reduce((s,r)=>s+r.amt,0));
+  const v2 = yr2 ? months.map(m=>RAW.filter(r=>r.year===yr2&&r.month===m).reduce((s,r)=>s+r.amt,0)) : months.map(()=>0);
+  const max = Math.max(...v1,...v2,1);
+  const H = 80;
+
+  // Update card subtitle dynamically
+  const cs = document.querySelector('#monthlyTrend')?.closest('.card')?.querySelector('.cs');
+  if(cs) cs.textContent = `Month-by-month comparison — ${yr2||''}${yr2?' vs ':''}${yr1} — hover bars for values`;
+
   wrap.innerHTML=`
     <div style="display:flex;align-items:flex-end;gap:3px;height:${H}px;">
       ${months.map((m,i)=>`
         <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;height:100%;justify-content:flex-end;">
-          <div style="width:45%;height:${(v24[i]/max*H).toFixed(0)}px;background:#06b6d4;border-radius:2px 2px 0 0;opacity:.7;cursor:pointer"
-            onmousemove="tip(event,'${MONTHS[i]} 2024','${fmtQ(v24[i])}')" onmouseleave="ht()"></div>
-          <div style="width:45%;height:${(v25[i]/max*H).toFixed(0)}px;background:#00e5a0;border-radius:2px 2px 0 0;cursor:pointer"
-            onmousemove="tip(event,'${MONTHS[i]} 2025','${fmtQ(v25[i])}')" onmouseleave="ht()"></div>
+          ${yr2?`<div style="width:45%;height:${Math.max((v2[i]/max*H),v2[i]>0?2:0).toFixed(0)}px;background:${colors[yr2]};border-radius:2px 2px 0 0;opacity:.75;cursor:pointer;min-height:${v2[i]>0?'2px':'0'}"
+            onmousemove="tip(event,'${MONTHS[i]} ${yr2}','${fmtQ(v2[i])}')" onmouseleave="ht()"></div>`:''}
+          <div style="width:45%;height:${Math.max((v1[i]/max*H),v1[i]>0?2:0).toFixed(0)}px;background:${colors[yr1]};border-radius:2px 2px 0 0;cursor:pointer;min-height:${v1[i]>0?'2px':'0'}"
+            onmousemove="tip(event,'${MONTHS[i]} ${yr1}','${fmtQ(v1[i])}')" onmouseleave="ht()"></div>
         </div>`).join('')}
     </div>
     <div style="display:flex;gap:3px;margin-top:4px;">
       ${months.map((_,i)=>`<div style="flex:1;text-align:center;font-size:8px;color:#3a4a5a">${MONTHS[i]}</div>`).join('')}
     </div>
     <div style="display:flex;gap:16px;margin-top:8px;">
-      <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:#4a5a6a"><span style="width:10px;height:10px;background:#06b6d4;border-radius:2px;display:inline-block;opacity:.7"></span>2024</div>
-      <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:#4a5a6a"><span style="width:10px;height:10px;background:#00e5a0;border-radius:2px;display:inline-block"></span>2025</div>
+      ${yr2?`<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:#4a5a6a">
+        <span style="width:10px;height:10px;background:${colors[yr2]};border-radius:2px;display:inline-block;opacity:.75"></span>${yr2}</div>`:''}
+      <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:#4a5a6a">
+        <span style="width:10px;height:10px;background:${colors[yr1]};border-radius:2px;display:inline-block"></span>${yr1}</div>
     </div>`;
 }
 
@@ -1066,6 +1100,167 @@ document.addEventListener('mousemove',e=>{if(ttEl.classList.contains('v'))mv(e);
 document.addEventListener('touchstart',()=>ht(),{passive:true});
 
 /* ═══════════════════════════════════════════
+   MONTHLY EXPENDITURE SUMMARY
+═══════════════════════════════════════════ */
+let monthView = 'all'; // 'all' or 'selected'
+
+function setMonthView(v, btn){
+  monthView = v;
+  document.querySelectorAll('#mViewAll,#mViewSel').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  buildMonthSummary();
+}
+
+function buildMonthSummary(){
+  const wrap = document.getElementById('monthSummaryArea');
+  const d    = filtered();
+
+  if(monthView === 'selected' && fM !== 'all'){
+    // ── SELECTED MONTH DETAIL ──────────────────────────────────────────
+    const mData  = d.filter(r=>r.month===fM);
+    const total  = mData.reduce((s,r)=>s+r.amt,0);
+    const mName  = MONTHS[fM-1];
+
+    // Category breakdown
+    const catMap = mData.reduce((a,r)=>{a[r.category]=(a[r.category]||0)+r.amt;return a;},{});
+    const catSorted = Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+    const catMax = catSorted[0]?.[1]||1;
+
+    // Vendor breakdown
+    const venMap = mData.reduce((a,r)=>{a[r.vendor]=(a[r.vendor]||0)+r.amt;return a;},{});
+    const venSorted = Object.entries(venMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const venMax = venSorted[0]?.[1]||1;
+
+    // Store breakdown
+    const stMap = mData.reduce((a,r)=>{a[r.store]=(a[r.store]||0)+r.amt;return a;},{});
+    const stSorted = Object.entries(stMap).sort((a,b)=>b[1]-a[1]);
+
+    document.getElementById('monthSumSub').textContent =
+      `${mName}${fY!=='all'?' '+fY:' (all years)'} — ${mData.length} LPOs · ${fmtQ(total)} total spend`;
+
+    wrap.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+
+        <!-- Category breakdown -->
+        <div>
+          <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#4a5a6a;font-weight:700;margin-bottom:10px;">By Category</div>
+          ${catSorted.map(([k,v])=>`
+            <div class="hbar-row">
+              <div class="hbar-lbl" style="color:${catColor(k)};width:100px" title="${k}">${k.length>13?k.slice(0,12)+'…':k}</div>
+              <div class="hbar-track" onmousemove="tip(event,'${k}','${fmtQ(v)}')" onmouseleave="ht()">
+                <div class="hbar-fill" style="width:${(v/catMax*100).toFixed(1)}%;background:${catColor(k)};color:#080808">
+                  ${v>catMax*.2?fmtS(v):''}
+                </div>
+              </div>
+              <div class="hbar-val">${v<=catMax*.2?fmtS(v):''}</div>
+            </div>`).join('')}
+        </div>
+
+        <!-- Vendor breakdown -->
+        <div>
+          <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#4a5a6a;font-weight:700;margin-bottom:10px;">Top Vendors</div>
+          ${venSorted.map(([v,a])=>`
+            <div class="hbar-row">
+              <div class="hbar-lbl" style="width:80px" title="${v}">${v.length>10?v.slice(0,9)+'…':v}</div>
+              <div class="hbar-track" onmousemove="tip(event,'${v}','${fmtQ(a)}')" onmouseleave="ht()">
+                <div class="hbar-fill" style="width:${(a/venMax*100).toFixed(1)}%;background:#00e5a0;color:#080808">
+                  ${a>venMax*.2?fmtS(a):''}
+                </div>
+              </div>
+              <div class="hbar-val">${a<=venMax*.2?fmtS(a):''}</div>
+            </div>`).join('')}
+        </div>
+
+        <!-- Store breakdown -->
+        <div>
+          <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#4a5a6a;font-weight:700;margin-bottom:10px;">By Store</div>
+          ${stSorted.filter(([s])=>STORE_C[s]).map(([s,v])=>`
+            <div class="hbar-row">
+              <div class="hbar-lbl" style="color:${STORE_C[s]||'#d0d8e8'};width:60px">${s}</div>
+              <div class="hbar-track" onmousemove="tip(event,'${s}','${fmtQ(v)}')" onmouseleave="ht()">
+                <div class="hbar-fill" style="width:${(v/(stSorted[0][1]||1)*100).toFixed(1)}%;background:${STORE_C[s]||'#4a5a6a'};color:#fff">
+                  ${v/(stSorted[0][1]||1)>.2?fmtS(v):''}
+                </div>
+              </div>
+              <div class="hbar-val">${v/(stSorted[0][1]||1)<=.2?fmtS(v):''}</div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+
+  } else {
+    // ── ALL MONTHS TABLE ──────────────────────────────────────────────
+    const years = fY !== 'all' ? [fY] : [...new Set(d.filter(r=>r.year).map(r=>r.year))].sort((a,b)=>a-b);
+
+    document.getElementById('monthSumSub').textContent =
+      `All months overview — click a month button above for detailed breakdown`;
+
+    // Build month × year grid
+    const rows = MONTHS.map((mName, mi) => {
+      const m = mi + 1;
+      const yearCols = years.map(y => {
+        const v = d.filter(r=>r.year===y&&r.month===m).reduce((s,r)=>s+r.amt,0);
+        const n = d.filter(r=>r.year===y&&r.month===m).length;
+        return {v, n};
+      });
+      const total = yearCols.reduce((s,x)=>s+x.v,0);
+      return {mName, m, yearCols, total};
+    }).filter(r=>r.total>0);
+
+    const maxTotal = Math.max(...rows.map(r=>r.total),1);
+
+    wrap.innerHTML = `
+      <div class="tbl-wrap">
+        <table class="dt">
+          <thead><tr>
+            <th class="tl">Month</th>
+            ${years.map(y=>`<th style="color:${YR_C[y]||'#f0f0f0'}">${y}<br><span style="font-size:8px;color:#3a4a5a">LPOs · QAR</span></th>`).join('')}
+            <th style="color:#ff6b35">Total</th>
+            <th class="tl" style="min-width:120px">Spend Bar</th>
+          </tr></thead>
+          <tbody>
+            ${rows.map(r=>`
+              <tr onclick="quickMonthFilter(${r.m})" style="cursor:pointer;" title="Click to filter by ${r.mName}">
+                <td class="tl" style="font-weight:700;color:#00e5a0">${r.mName}</td>
+                ${r.yearCols.map(({v,n})=>`
+                  <td style="color:${v>0?'#d0d8e8':'#1e1e1e'}">
+                    ${v>0?`<span style="font-size:10px;color:#4a5a6a">${n} · </span>${fmtS(v)}`:'—'}
+                  </td>`).join('')}
+                <td style="color:#ff6b35;font-weight:700">${fmtS(r.total)}</td>
+                <td>
+                  <div style="background:#1a1a1a;border-radius:3px;height:14px;overflow:hidden;">
+                    <div style="width:${(r.total/maxTotal*100).toFixed(1)}%;background:#ff6b35;height:100%;border-radius:3px;transition:width .8s ease;"></div>
+                  </div>
+                </td>
+              </tr>`).join('')}
+            <tr class="totrow">
+              <td class="tl" style="color:#00e5a0;font-size:11px">TOTAL</td>
+              ${years.map(y=>{
+                const yv=d.filter(r=>r.year===y).reduce((s,r)=>s+r.amt,0);
+                const yn=d.filter(r=>r.year===y).length;
+                return `<td style="color:${YR_C[y]||'#f0f0f0'};font-weight:700"><span style="font-size:10px;color:#4a5a6a">${yn} · </span>${fmtS(yv)}</td>`;
+              }).join('')}
+              <td style="color:#ff6b35;font-weight:800;font-size:14px">${fmtS(d.reduce((s,r)=>s+r.amt,0))}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="font-size:10px;color:#3a4a5a;margin-top:8px;">💡 Click any row to filter the entire dashboard by that month</div>`;
+  }
+}
+
+function quickMonthFilter(m){
+  // Click a month row → activate that month filter
+  fM = m;
+  monthView = 'selected';
+  document.querySelectorAll('#monthBtns .mb').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('#monthBtns .mb')[m].classList.add('on');
+  document.getElementById('mViewAll').classList.remove('on');
+  document.getElementById('mViewSel').classList.add('on');
+  lpoPage=0; rebuild(); updateDateTag();
+}
+
+/* ═══════════════════════════════════════════
    PO DETAIL MODAL
 ═══════════════════════════════════════════ */
 function openModal(lpoNum){
@@ -1148,6 +1343,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModalBtn(); 
 function rebuild(){
   buildKpi1();
   buildKpi2();
+  buildMonthSummary();
   buildYrCompare();
   buildMonthlyTrend();
   buildDonut();
