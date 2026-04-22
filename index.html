@@ -257,13 +257,6 @@ table.dt td.zero{color:#252525;}
   <span class="fl">Category</span>
   <div class="btn-g" id="catBtns">
     <button class="fb on" onclick="setF('cat','all',this)">All</button>
-    <button class="fb" onclick="setF('cat','Refrigeration Maint.',this)">Refrig.</button>
-    <button class="fb" onclick="setF('cat','Procurement',this)">Procure.</button>
-    <button class="fb" onclick="setF('cat','Civil Works',this)">Civil</button>
-    <button class="fb" onclick="setF('cat','Equipment Maint.',this)">Equip.</button>
-    <button class="fb" onclick="setF('cat','Fire &amp; Safety',this)">Fire</button>
-    <button class="fb" onclick="setF('cat','Signage &amp; Branding',this)">Signage</button>
-    <button class="fb" onclick="setF('cat','General Maint.',this)">General</button>
   </div>
 </div>
 
@@ -318,13 +311,7 @@ table.dt td.zero{color:#252525;}
         <th style="width:30px">#</th>
         <th class="tl">Vendor</th>
         <th>LPOs</th>
-        <th style="color:#06b6d4">Refrig.</th>
-        <th style="color:#7b61ff">Procure.</th>
-        <th style="color:#ff6b35">Civil</th>
-        <th style="color:#00b37a">Equip.</th>
-        <th style="color:#ef4444">Fire</th>
-        <th style="color:#d4a800">Signage</th>
-        <th style="color:#64748b">General</th>
+        <th id="vCatHeaders" colspan="7" style="text-align:center;color:#6b7a8d">Categories (loading...)</th>
         <th style="color:#f0f0f0;font-weight:800">TOTAL</th>
         <th>Avg/LPO</th>
       </tr></thead>
@@ -409,6 +396,8 @@ async function loadData() {
         'Last updated: ' + d.toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) +
         ' ' + d.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
     }
+    buildCats(json.categories || [...new Set(RAW.map(r=>r.category))].sort());
+    buildCatButtons();
     rebuild();
   } catch(e) {
     loading.style.display = 'none';
@@ -421,15 +410,22 @@ async function loadData() {
 /* ============================================================
    CONFIG — all plain hex, NO CSS vars in JS
    ============================================================ */
-const CATS = [
-  {k:'Refrigeration Maint.', l:'Refrig.',   c:'#06b6d4'},
-  {k:'Procurement',          l:'Procure.',  c:'#7b61ff'},
-  {k:'Civil Works',          l:'Civil',     c:'#ff6b35'},
-  {k:'Equipment Maint.',     l:'Equip.',    c:'#00b37a'},
-  {k:'General Maint.',       l:'General',   c:'#64748b'},
-  {k:'Signage & Branding',   l:'Signage',   c:'#d4a800'},
-  {k:'Fire & Safety',        l:'Fire',      c:'#ef4444'}
+/* CATS built dynamically from data.json categories */
+const CAT_PALETTE = [
+  '#06b6d4','#7b61ff','#ff6b35','#00b37a','#ef4444',
+  '#d4a800','#f472b6','#a78bfa','#34d399','#fb923c',
+  '#60a5fa','#4ade80','#facc15','#e879f9','#94a3b8',
+  '#22d3ee','#f87171','#86efac','#fcd34d','#c084fc'
 ];
+let CATS = []; // populated after data.json loads
+
+function buildCats(categoryList) {
+  CATS = categoryList.map((k, i) => ({
+    k: k,
+    l: k.length > 14 ? k.substring(0, 13) + '.' : k,
+    c: CAT_PALETTE[i % CAT_PALETTE.length]
+  }));
+}
 const STORES = ['TAWAR','PA','QQ','Z3','ALM','ALJ','BS'];
 const SC = {TAWAR:'#0f172a',PA:'#7b61ff',QQ:'#059669',Z3:'#ea580c',ALM:'#ca8a04',ALJ:'#db2777',BS:'#dc2626'};
 const YC = {2023:'#7b61ff',2024:'#0891b2',2025:'#059669',2026:'#ea580c'};
@@ -620,6 +616,13 @@ function buildYrBars(){
    VENDOR TABLE
    ============================================================ */
 function renderVendors(){
+  // Rebuild vendor table category header columns dynamically
+  const vhdr = document.getElementById('vCatHeaders');
+  if(vhdr && CATS.length) {
+    vhdr.outerHTML = CATS.map(c=>
+      `<th style="color:${c.c};font-size:9px;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.k}">${c.l}</th>`
+    ).join('');
+  }
   const d=filtered();
   const q=(document.getElementById('vSearch').value||'').toLowerCase();
   let vs=[...new Set(d.map(r=>r.vendor))].map(v=>{
@@ -639,7 +642,7 @@ function renderVendors(){
         <div class="vbar-mini" style="width:${(x.t/mx*100).toFixed(0)}%"></div>
       </td>
       <td style="font-weight:700">${x.n}</td>
-      ${CATS.map(c=>`<td class="${x.ct[c.k]?'':'zero'}" style="${x.ct[c.k]?'color:'+c.c+';font-weight:600':''}">${fmtS(x.ct[c.k])}</td>`).join('')}
+      ${CATS.map(c=>`<td class="${x.ct[c.k]?'':'zero'}" style="${x.ct[c.k]?'color:'+c.c+';font-weight:600':''}" title="${c.k}">${fmtS(x.ct[c.k])}</td>`).join('')}
       <td style="font-weight:800;color:#0f172a">${fmtS(x.t)}</td>
       <td style="color:#64748b">${fmtS(x.t/x.n)}</td>
     </tr>`).join('');
@@ -733,6 +736,27 @@ document.addEventListener('touchstart',()=>ht(),{passive:true});
 /* ============================================================
    INIT
    ============================================================ */
+function buildCatButtons() {
+  const wrap = document.getElementById('catBtns');
+  // Keep the "All" button, remove old category buttons
+  const allBtn = wrap.querySelector('.fb.on') || wrap.querySelector('.fb');
+  wrap.innerHTML = '';
+  const allB = document.createElement('button');
+  allB.className = 'fb on';
+  allB.textContent = 'All';
+  allB.onclick = function(){ setF('cat','all',this); };
+  wrap.appendChild(allB);
+  CATS.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'fb';
+    b.textContent = c.l;
+    b.title = c.k;
+    b.style.borderColor = c.c + '55';
+    b.onclick = function(){ setF('cat', c.k, this); };
+    wrap.appendChild(b);
+  });
+}
+
 function rebuild(){
   buildKpi();buildStoreBars();buildDonut();
   buildStacked();buildYrBars();
