@@ -205,6 +205,22 @@ table.po-tbl tfoot td{padding:7px 8px;font-size:12px;}
 .lpo-link{color:#00e5a0;cursor:pointer;text-decoration:underline;text-underline-offset:2px;font-weight:700;}
 .lpo-link:hover{color:#fff;}
 
+/* ── DATE FILTER ── */
+.date-filters{background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.date-filters .fl{font-size:9px;color:#4a5a6a;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;flex-shrink:0;}
+.date-input{background:#0d0d0d;border:1px solid #2a2a2a;border-radius:6px;color:#f0f0f0;font-size:12px;padding:5px 10px;font-family:inherit;outline:none;cursor:pointer;transition:border-color .15s;}
+.date-input:focus,.date-input:hover{border-color:#00e5a0;}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(0.5);}
+.date-sep{color:#3a4a5a;font-size:12px;}
+.date-clear{padding:5px 12px;border-radius:5px;border:1px solid #2a2a2a;background:transparent;color:#4a5a6a;font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s;}
+.date-clear:hover{border-color:#ef4444;color:#ef4444;}
+.date-active-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);color:#00e5a0;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;}
+.date-active-tag button{background:none;border:none;color:#00e5a0;cursor:pointer;font-size:13px;padding:0 0 0 4px;line-height:1;}
+.month-btns{display:flex;gap:3px;flex-wrap:wrap;}
+.mb{padding:4px 9px;border-radius:5px;border:1px solid #1e1e1e;background:#0d0d0d;color:#4a5a6a;font-size:10px;cursor:pointer;transition:all .15s;font-family:inherit;font-weight:500;}
+.mb.on{background:#00e5a0;color:#080808;border-color:#00e5a0;font-weight:700;}
+.mb:hover:not(.on){border-color:#00e5a0;color:#00e5a0;}
+
 @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr);}.kpi-row2{grid-template-columns:repeat(2,1fr);}.grid2,.grid3,.grid4{grid-template-columns:1fr;}}
 @media(max-width:600px){.kpi-grid{grid-template-columns:repeat(2,1fr);}.kpi-row2{grid-template-columns:repeat(2,1fr);}.page{padding:0 10px 60px;}.filters{gap:5px;padding:10px;}.fdiv{display:none;}.fl{display:none;}}
 </style>
@@ -267,6 +283,33 @@ table.po-tbl tfoot td{padding:7px 8px;font-size:12px;}
   <div class="btn-g" id="catBtns">
     <button class="fb on" onclick="setF('cat','all',this)">All</button>
   </div>
+</div>
+
+<!-- DATE / MONTH FILTER -->
+<div class="date-filters">
+  <span class="fl">Month</span>
+  <div class="month-btns" id="monthBtns">
+    <button class="mb on" onclick="setMonth('all',this)" title="All months">All</button>
+    <button class="mb" onclick="setMonth(1,this)">Jan</button>
+    <button class="mb" onclick="setMonth(2,this)">Feb</button>
+    <button class="mb" onclick="setMonth(3,this)">Mar</button>
+    <button class="mb" onclick="setMonth(4,this)">Apr</button>
+    <button class="mb" onclick="setMonth(5,this)">May</button>
+    <button class="mb" onclick="setMonth(6,this)">Jun</button>
+    <button class="mb" onclick="setMonth(7,this)">Jul</button>
+    <button class="mb" onclick="setMonth(8,this)">Aug</button>
+    <button class="mb" onclick="setMonth(9,this)">Sep</button>
+    <button class="mb" onclick="setMonth(10,this)">Oct</button>
+    <button class="mb" onclick="setMonth(11,this)">Nov</button>
+    <button class="mb" onclick="setMonth(12,this)">Dec</button>
+  </div>
+  <div style="width:1px;height:20px;background:#1e1e1e;margin:0 6px;flex-shrink:0;"></div>
+  <span class="fl">Date Range</span>
+  <input type="date" class="date-input" id="dateFrom" onchange="applyDateRange()" title="From date">
+  <span class="date-sep">→</span>
+  <input type="date" class="date-input" id="dateTo" onchange="applyDateRange()" title="To date">
+  <button class="date-clear" onclick="clearDates()" title="Clear date filter">✕ Clear</button>
+  <div id="dateActiveTag" style="display:none;"></div>
 </div>
 
 <!-- ROW 1: CORE KPIs -->
@@ -499,7 +542,7 @@ const YR_C = {2023:'#7b61ff',2024:'#06b6d4',2025:'#00e5a0',2026:'#ff6b35'};
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 let RAW = [], CATS = [], META = {};
-let fY='all', fS='all', fC='all', lpoPage=0;
+let fY='all', fS='all', fC='all', fM='all', fFrom=null, fTo=null, lpoPage=0;
 const PG = 25;
 
 /* ═══════════════════════════════════════════
@@ -523,6 +566,12 @@ async function loadData(){
     CATS = cats.map((k,i)=>({k,l:k.length>16?k.slice(0,15)+'…':k,c:CAT_PALETTE[i%CAT_PALETTE.length]}));
     buildCatButtons();
     rebuild();
+    // Pre-set date inputs min/max based on data range
+    const dates = RAW.filter(r=>r.date_iso||r.year).map(r=>r.date_iso||`${r.year}-01-01`).sort();
+    if(dates.length){
+      document.getElementById('dateFrom').min = dates[0].slice(0,7)+'-01';
+      document.getElementById('dateTo').max   = dates[dates.length-1].slice(0,7)+'-28';
+    }
   } catch(e){
     document.getElementById('loadBanner').style.display='none';
     document.getElementById('errBanner').style.display='flex';
@@ -534,12 +583,81 @@ async function loadData(){
    HELPERS
 ═══════════════════════════════════════════ */
 function filtered(){
-  return RAW.filter(r=>
-    r.vendor && r.store && r.store!=='nan' &&
-    (fY==='all'||r.year===fY) &&
-    (fS==='all'||r.store===fS) &&
-    (fC==='all'||r.category===fC)
-  );
+  return RAW.filter(r=>{
+    if(!r.vendor||!r.store||r.store==='nan') return false;
+    if(fY!=='all'&&r.year!==fY) return false;
+    if(fS!=='all'&&r.store!==fS) return false;
+    if(fC!=='all'&&r.category!==fC) return false;
+    // Month filter
+    if(fM!=='all'&&r.month!==fM) return false;
+    // Date range filter — uses r.date_iso if available, else year+month
+    if(fFrom||fTo){
+      // Build a comparable date string from record
+      let recDate = null;
+      if(r.date_iso){ recDate = r.date_iso; }
+      else if(r.year&&r.month){ recDate = `${r.year}-${String(r.month).padStart(2,'0')}-01`; }
+      if(recDate){
+        if(fFrom&&recDate<fFrom) return false;
+        if(fTo&&recDate>fTo+'-31') return false;
+      }
+    }
+    return true;
+  });
+}
+
+function setMonth(m, btn){
+  fM = m;
+  // Clear date range when month picked
+  fFrom = null; fTo = null;
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+  document.getElementById('dateActiveTag').style.display = 'none';
+  document.querySelectorAll('#monthBtns .mb').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  lpoPage=0; rebuild();
+  updateDateTag();
+}
+
+function applyDateRange(){
+  const from = document.getElementById('dateFrom').value;
+  const to   = document.getElementById('dateTo').value;
+  if(!from && !to) { clearDates(); return; }
+  fFrom = from || null;
+  fTo   = to   || null;
+  // Reset month filter when date range used
+  fM = 'all';
+  document.querySelectorAll('#monthBtns .mb').forEach(b=>b.classList.remove('on'));
+  document.querySelector('#monthBtns .mb').classList.add('on');
+  lpoPage=0; rebuild();
+  updateDateTag();
+}
+
+function clearDates(){
+  fFrom = null; fTo = null; fM = 'all';
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+  document.querySelectorAll('#monthBtns .mb').forEach(b=>b.classList.remove('on'));
+  document.querySelector('#monthBtns .mb').classList.add('on');
+  document.getElementById('dateActiveTag').style.display = 'none';
+  lpoPage=0; rebuild();
+}
+
+function updateDateTag(){
+  const tag = document.getElementById('dateActiveTag');
+  let label = '';
+  if(fFrom||fTo){
+    const f = fFrom ? new Date(fFrom).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : 'Start';
+    const t = fTo   ? new Date(fTo).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})   : 'Today';
+    label = `${f} → ${t}`;
+  } else if(fM!=='all'){
+    label = MONTHS[fM-1] + (fY!=='all'?' '+fY:'');
+  }
+  if(label){
+    tag.style.display='inline-flex';
+    tag.innerHTML=`<span class="date-active-tag">📅 ${label} <button onclick="clearDates()">✕</button></span>`;
+  } else {
+    tag.style.display='none';
+  }
 }
 function setF(t,v,btn){
   if(t==='year'){fY=v;document.querySelectorAll('#yrBtns .fb').forEach(b=>b.classList.remove('on'));}
