@@ -1758,64 +1758,71 @@ function renderPayments() {
 function calcPlannerRow(r) {
   const days = daysAgo(r.date_issued);
   const s = (r.payment_schedule||'').toUpperCase();
-  const isAdvance = s.includes('ADVANCE');
+  const ps = (r.payment_status||'').toUpperCase();
+  // PRIORITY 1: Payment Schedule = ADVANCE AND Payment Status = DUE
+  const isAdvance = s.includes('ADVANCE') && ps === 'DUE';
 
-  // Payment recommendation by aging:
-  // 0–30 days  → 30%  (1 month due)
-  // 31–60 days → 50%  (priority due within 60 days)
-  // 60+ days   → 100% (overdue — full settlement)
-  let recommended, basis;
-  if (days > 60) {
-    recommended = r.amount;
-    basis = '🔴 Overdue >60d — Full';
-  } else if (days > 30) {
-    recommended = r.amount * 0.50;
-    basis = '🟠 Due 31–60d — 50%';
-  } else {
-    recommended = r.amount * 0.30;
-    basis = '🟡 Due <30d — 30%';
-  }
+  let recommended, basis, priority;
 
-  // Advance payment invoices: escalate to 100% regardless of age
   if (isAdvance) {
+    // Priority 1: Advance payment matched with DUE → 100% immediate
     recommended = r.amount;
-    basis = '⚡ Advance Payment — 100%';
+    basis = '⚡ Advance + DUE — 100%';
+    priority = 1;
+  } else if (days >= 60) {
+    // Priority 2: Due more than 2–3 months (60–90 days) → 100%
+    recommended = r.amount;
+    basis = '🔴 Overdue 2–3 Months — 100%';
+    priority = 2;
+  } else if (days >= 15) {
+    // Priority 3: Due 15–30 days → 50%
+    recommended = r.amount * 0.50;
+    basis = '🟠 Due 15–30 Days — 50%';
+    priority = 3;
+  } else {
+    // Under 15 days → 30%
+    recommended = r.amount * 0.30;
+    basis = '🟡 Due <15 Days — 30%';
+    priority = 4;
   }
 
   const pct = recommended / r.amount * 100;
-  return {r, days, recommended, basis, pct, isAdvance};
+  return {r, days, recommended, basis, pct, isAdvance, priority};
 }
 function renderPlanner() {
   const now = new Date();
   const cutoff = new Date(now.getFullYear(), now.getMonth() - 2, 1); // first day of 3 months ago
-  const pending = getFilteredData().filter(r => {
-    if (r.invoice_status !== 'PENDING') return false;
-    if (!r.date_issued) return true; // include if no date
-    const d = new Date(r.date_issued);
-    return d >= cutoff;
+  const plannerData = getFilteredData().filter(r => {
+    // Exclude paid records
+    if ((r.payment_status||'').toUpperCase() === 'PAID') return false;
+    // Only include DUE payment status (PENDING = invoice not yet submitted)
+    const isDue = (r.payment_status||'').toUpperCase() === 'DUE';
+    if (!isDue) return false;
+    // Within last 3 months
+    if (!r.date_issued) return true;
+    return new Date(r.date_issued) >= cutoff;
   });
-  const rows = pending.map(calcPlannerRow).sort((a,b) => {
-    if (a.isAdvance && !b.isAdvance) return -1;
-    if (!a.isAdvance && b.isAdvance) return 1;
+  const rows = plannerData.map(calcPlannerRow).sort((a,b) => {
+    if (a.priority !== b.priority) return a.priority - b.priority;
     return b.days - a.days;
   });
-  const totalOut = pending.reduce((a,b)=>a+b.amount,0);
+  const totalOut = plannerData.reduce((a,b)=>a+b.amount,0);
   const totalRec = rows.reduce((a,b)=>a+b.recommended,0);
-  const urgent = rows.filter(r=>r.days>60).length;
-  const phased = rows.filter(r=>r.days<=60).length;
+  const advCount = rows.filter(r=>r.isAdvance).length;
+  const overdueCount = rows.filter(r=>r.priority===2).length;
 
   // Show date range label
   const lbl = document.getElementById('planner-range-label');
   if (lbl) {
     const from = cutoff.toLocaleDateString('en-QA',{month:'short',year:'numeric'});
     const to = now.toLocaleDateString('en-QA',{month:'short',year:'numeric'});
-    lbl.textContent = `Showing LPOs issued: ${from} – ${to}`;
+    lbl.textContent = `Scope: ${from} – ${to} · Excludes PAID`;
   }
   document.getElementById('planner-kpis').innerHTML = `
-    <div class="kpi-card"><div class="kpi-label">Outstanding Invoices</div><div class="kpi-value mono">${pending.length}</div><div class="kpi-sub">Pending payment</div></div>
-    <div class="kpi-card"><div class="kpi-label">Recommended Outflow</div><div class="kpi-value mono" style="color:var(--amber);font-size:18px">${formatQAR(totalRec)}</div><div class="kpi-sub">This cycle</div></div>
-    <div class="kpi-card"><div class="kpi-label">Advance Priority</div><div class="kpi-value mono" style="color:var(--blue)">${rows.filter(r=>r.isAdvance).length}</div><div class="kpi-sub">Full payment due</div></div>
-    <div class="kpi-card"><div class="kpi-label">Overdue >60 Days</div><div class="kpi-value mono" style="color:var(--red)">${rows.filter(r=>r.days>60&&!r.isAdvance).length}</div><div class="kpi-sub">100% settlement</div></div>`;
+    <div class="kpi-card"><div class="kpi-label">Invoices In Plan</div><div class="kpi-value mono">${plannerData.length}</div><div class="kpi-sub">DUE invoices (last 3 months)</div></div>
+    <div class="kpi-card"><div class="kpi-label">Recommended Outflow</div><div class="kpi-value mono" style="color:var(--amber);font-size:18px">${formatQAR(totalRec)}</div><div class="kpi-sub">This payment cycle</div></div>
+    <div class="kpi-card"><div class="kpi-label">⚡ Advance Priority</div><div class="kpi-value mono" style="color:var(--blue)">${advCount}</div><div class="kpi-sub">Advance + DUE match</div></div>
+    <div class="kpi-card"><div class="kpi-label">🔴 Overdue 2–3 Months</div><div class="kpi-value mono" style="color:var(--red)">${overdueCount}</div><div class="kpi-sub">60–90 days overdue</div></div>`;
 
   let thtml = '<table><thead><tr><th>Priority</th><th>LPO #</th><th>Vendor</th><th>Store</th><th>Category</th><th>Payment Schedule</th><th>Invoice (QAR)</th><th>Days Out</th><th>Rec %</th><th>Rec Payment (QAR)</th><th>Basis</th><th>PO</th></tr></thead><tbody>';
   rows.forEach(({r, days, recommended, basis, pct, isAdvance}) => {
