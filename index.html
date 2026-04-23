@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Investment Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial; background:#f5f5f5; }
+    .kpi { display:inline-block; padding:20px; margin:10px; background:white; border-radius:10px; }
+  </style>
+</head>
+
+<body>
+
+<h2>📊 Investment Dashboard</h2>
+
+<div id="kpis">
+  <div class="kpi">Total Invested: ₹<span id="invested"></span></div>
+  <div class="kpi">Current Value: ₹<span id="current"></span></div>
+  <div class="kpi">Profit/Loss: ₹<span id="pl"></span></div>
+  <div class="kpi">Return: <span id="return"></span>%</div>
+  <div class="kpi">Top Performer: <span id="top"></span></div>
+</div>
+
+<canvas id="pieChart"></canvas>
+
+<script>
+
+// Sample Data (replace with your Excel JSON)
+const portfolio = [
+  { name: "RELIANCE", ticker: "RELIANCE.NS", qty: 10, buy: 2400 },
+  { name: "TCS", ticker: "TCS.NS", qty: 5, buy: 3200 }
+];
+
+// Fetch live price
+async function getPrice(ticker){
+  const res = await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}`);
+  const data = await res.json();
+  return data.quoteResponse.result[0].regularMarketPrice;
+}
+
+async function loadDashboard(){
+
+  let invested = 0, current = 0;
+  let best = {name:"", gain:-999999};
+
+  for (let stock of portfolio){
+
+    let price = await getPrice(stock.ticker);
+
+    let inv = stock.qty * stock.buy;
+    let cur = stock.qty * price;
+
+    invested += inv;
+    current += cur;
+
+    let gain = cur - inv;
+
+    if (gain > best.gain){
+      best = {name: stock.name, gain: gain};
+    }
+  }
+
+  let pl = current - invested;
+  let ret = ((pl/invested)*100).toFixed(2);
+
+  document.getElementById("invested").innerText = invested.toFixed(2);
+  document.getElementById("current").innerText = current.toFixed(2);
+  document.getElementById("pl").innerText = pl.toFixed(2);
+  document.getElementById("return").innerText = ret;
+  document.getElementById("top").innerText = best.name;
+
+}
+
+loadDashboard();
+
+</script>
+
+</body>
+</html>
