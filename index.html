@@ -529,7 +529,7 @@ select{-webkit-appearance:none;appearance:none}
   </div>
   <div class="kpi-row kpi-row-4" id="planner-kpis"></div>
   <div class="table-card" style="margin-bottom:24px">
-    <div class="table-header" style="display:flex;align-items:center;justify-content:space-between"><span class="table-title">Payment Plan</span><span id="planner-range-label" style="font-size:11px;color:var(--text-2);font-family:'IBM Plex Mono',monospace"></span></div>
+    <div class="table-header" style="display:flex;align-items:center;justify-content:space-between"><span class="table-title">Payment Plan</span><span id="planner-range-label" style="font-size:11px;color:var(--text-2);font-family:'IBM Plex Mono',monospace;text-align:right"></span></div>
     <div id="planner-table"></div>
   </div>
   <div class="table-card" style="margin-bottom:24px">
@@ -1672,8 +1672,15 @@ function renderSlideOver() {
 function renderPayments() {
   const data = getFilteredData();
   const total = data.reduce((a,b)=>a+b.amount,0);
-  const submitted = data.filter(r=>r.invoice_status==='SUBMITTED');
-  const pending = data.filter(r=>r.invoice_status==='PENDING');
+  // SUBMITTED = invoice submitted, awaiting payment
+  // PENDING   = invoice NOT yet submitted (exclude from outstanding)
+  // PAID      = exclude from outstanding
+  const submitted = data.filter(r => r.invoice_status === 'SUBMITTED');
+  const paid      = data.filter(r => (r.payment_status||'').toUpperCase() === 'PAID');
+  const pending   = data.filter(r =>
+    r.invoice_status === 'SUBMITTED' &&
+    (r.payment_status||'').toUpperCase() !== 'PAID'
+  );
   const submittedAmt = submitted.reduce((a,b)=>a+b.amount,0);
   const pendingAmt = pending.reduce((a,b)=>a+b.amount,0);
   const pendingPct = total ? (pendingAmt/total*100) : 0;
@@ -1681,8 +1688,8 @@ function renderPayments() {
   document.getElementById('pay-kpis').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Total Invoiced</div><div class="kpi-value mono" style="font-size:18px">${formatQAR(total)}</div><div class="kpi-sub">Full portfolio</div></div>
     <div class="kpi-card"><div class="kpi-label">Submitted / Cleared</div><div class="kpi-value mono" style="color:var(--green);font-size:18px">${formatQAR(submittedAmt)}</div><div class="kpi-sub">${submitted.length} invoices</div></div>
-    <div class="kpi-card"><div class="kpi-label">Pending / Outstanding</div><div class="kpi-value mono" style="color:var(--red);font-size:18px">${formatQAR(pendingAmt)}</div><div class="kpi-sub">${pending.length} invoices</div></div>
-    <div class="kpi-card" style="border-color:${pendingPct>5?'rgba(248,81,73,0.4)':'var(--border)'}"><div class="kpi-label">Pending % of Total</div><div class="kpi-value mono" style="color:${pendingPct>5?'var(--red)':'var(--green)'}">${pendingPct.toFixed(1)}%</div><div class="kpi-sub">${pendingPct>5?'⚠️ Above 5% threshold':'Within threshold'}</div></div>`;
+    <div class="kpi-card"><div class="kpi-label">Outstanding (Unpaid)</div><div class="kpi-value mono" style="color:var(--red);font-size:18px">${formatQAR(pendingAmt)}</div><div class="kpi-sub">${pending.length} submitted, awaiting payment</div></div>
+    <div class="kpi-card" style="border-color:${pendingPct>5?'rgba(248,81,73,0.4)':'var(--border)'}"><div class="kpi-label">Outstanding % of Total</div><div class="kpi-value mono" style="color:${pendingPct>5?'var(--red)':'var(--green)'}">${pendingPct.toFixed(1)}%</div><div class="kpi-sub">${pendingPct>5?'⚠️ Above 5% threshold':'Within threshold'}</div></div>`;
 
   // Invoice status donut
   destroyChart('chart-inv-status');
@@ -1733,8 +1740,12 @@ function renderPayments() {
     }
   });
 
-  // Aging report — build enriched pending list
-  const pendingAll = data.filter(r=>r.invoice_status==='PENDING').map(r=>({...r, days:daysAgo(r.date_issued)}));
+  // Aging report — SUBMITTED invoices not yet PAID (PENDING = not submitted yet, exclude)
+  const pendingAll = data.filter(r => {
+    if (r.invoice_status !== 'SUBMITTED') return false;          // exclude not-yet-submitted
+    if ((r.payment_status||'').toUpperCase() === 'PAID') return false; // exclude paid
+    return true;
+  }).map(r => ({...r, days: daysAgo(r.date_issued)}));
   const agingSum = (arr) => arr.reduce((a,b)=>a+b.amount,0);
   const aging = {
     current:  pendingAll.filter(r=>r.days<=30),
@@ -1979,9 +1990,14 @@ function renderPlanner() {
   const now = new Date();
   const cutoff = new Date(now.getFullYear(), now.getMonth() - 2, 1);
 
+  // PLANNER SCOPE:
+  // Include: SUBMITTED invoices (= invoice has been sent/submitted)
+  // Exclude: PENDING (invoice not submitted yet)
+  // Exclude: PAID (already settled)
+  // Scope: last 3 months
   const allData = getFilteredData().filter(r => {
-    if ((r.payment_status||'').toUpperCase() === 'PAID') return false;
-    if (r.invoice_status !== 'SUBMITTED') return false;
+    if (r.invoice_status !== 'SUBMITTED') return false;           // must be submitted
+    if ((r.payment_status||'').toUpperCase() === 'PAID') return false; // not paid
     if (!r.date_issued) return false;
     return new Date(r.date_issued) >= cutoff;
   });
@@ -2094,45 +2110,82 @@ function renderPlanner() {
     <div class="kpi-card"><div class="kpi-label">Monthly Allocation</div><div class="kpi-value mono" style="color:var(--amber);font-size:18px">${formatQAR(totalRec)}</div><div class="kpi-sub">35% of outstanding per vendor</div></div>
     <div class="kpi-card"><div class="kpi-label">⚡ Advance + DUE</div><div class="kpi-value mono" style="color:var(--green)">${dueCount}</div><div class="kpi-sub">Auto-included invoices</div></div>`;
 
-  // Plan table
+  // ── Payment Plan Table — TOP 5 vendors, one row per vendor ──
+  // Build vendor summary from planRows
+  const vendorPlanSummary = {};
+  planRows.forEach(({r, cappedRec, days, priority, isAdvance, isDue}) => {
+    if (!vendorPlanSummary[r.vendor]) {
+      vendorPlanSummary[r.vendor] = {
+        vendor: r.vendor, lpoCount: 0, totalOut: 0,
+        monthlyAlloc: 0, maxDays: 0, hasAdvance: false, hasDue: false,
+        topPriority: 99
+      };
+    }
+    const vs = vendorPlanSummary[r.vendor];
+    vs.lpoCount++;
+    vs.totalOut += r.amount;
+    vs.monthlyAlloc += cappedRec;
+    if (days > vs.maxDays) vs.maxDays = days;
+    if (isAdvance) vs.hasAdvance = true;
+    if (isDue) vs.hasDue = true;
+    if (priority < vs.topPriority) vs.topPriority = priority;
+  });
+
+  // Sort by monthly allocation desc, take top 5
+  const top5 = Object.values(vendorPlanSummary)
+    .sort((a,b) => b.monthlyAlloc - a.monthlyAlloc)
+    .slice(0, 5);
+
   let thtml = `<table><thead><tr>
-    <th>Priority</th><th>LPO #</th><th>Vendor</th><th>Store</th><th>Category</th>
-    <th>Payment Schedule</th><th>Invoice (QAR)</th><th>Days</th><th>Basis</th>
-    <th>Monthly Rec (QAR)</th><th>Action</th><th>PO</th>
+    <th>#</th><th>Vendor</th><th>LPOs in Scope</th>
+    <th>Total Outstanding (QAR)</th><th>Monthly Budget (35%)</th>
+    <th>Allocated This Month</th><th>Allocation %</th><th>Max Days</th><th>Status</th>
   </tr></thead><tbody>`;
 
-  if (planRows.length === 0) {
-    thtml += '<tr><td colspan="12" style="text-align:center;color:var(--text-3);padding:24px">No invoices in plan. Add invoices using the vendor cards below.</td></tr>';
+  if (top5.length === 0) {
+    thtml += '<tr><td colspan="9" style="text-align:center;color:var(--text-3);padding:24px">No submitted invoices found in last 3 months.</td></tr>';
   }
 
-  planRows.forEach(({r, days, cappedRec, basis, isAdvance, isManual, isDue, priority}) => {
-    const pct = r.amount > 0 ? (cappedRec/r.amount*100).toFixed(0) : 0;
-    const rowBg = isAdvance ? 'background:rgba(88,166,255,0.07);' : isManual ? 'background:rgba(163,113,247,0.06);' : priority===2 ? 'background:rgba(248,81,73,0.05);' : '';
-    const badge = isAdvance
-      ? '<span class="kpi-badge" style="background:rgba(88,166,255,0.2);color:var(--blue);font-size:9px">⚡ P1 ADV</span>'
-      : isManual
-        ? '<span class="kpi-badge" style="background:rgba(163,113,247,0.2);color:#A371F7;font-size:9px">✋ MANUAL</span>'
-        : priorityLabel(days);
-    thtml += `<tr style="${rowBg}">
-      <td>${badge}</td>
-      <td class="mono-cell" style="color:var(--blue)">${r.lpo_no}</td>
-      <td style="font-weight:500">${r.vendor}</td>
-      <td><span class="kpi-badge badge-blue">${r.store}</span></td>
-      <td style="font-size:11px;color:var(--text-2)">${r.category}</td>
-      <td style="font-size:10px;color:var(--text-2)">${r.payment_schedule||'—'}</td>
-      <td class="mono-cell right">${formatQAR(r.amount)}</td>
-      <td class="mono-cell" style="color:${days>=60?'var(--red)':days>=15?'var(--amber)':'var(--text-1)'}">${days}d</td>
-      <td style="font-size:10px;color:var(--text-2)">${basis}</td>
-      <td class="mono-cell right" style="color:var(--green);font-weight:700">${formatQAR(cappedRec)} <span style="font-size:9px;color:var(--text-3)">(${pct}%)</span></td>
-      <td>${!isDue ? `<button class="btn-add-plan added" onclick="toggleManualPlan(${r.lpo_no},this)">✕ Remove</button>` : '<span style="font-size:10px;color:var(--text-3)">Auto</span>'}</td>
-      <td>${r.po_link?`<a href="${r.po_link}" target="_blank" class="action-btn primary" style="font-size:10px">PO</a>`:'—'}</td>
+  top5.forEach((vs, i) => {
+    const allocPct = vs.totalOut > 0 ? (vs.monthlyAlloc/vs.totalOut*100).toFixed(0) : 0;
+    const budget35 = vs.totalOut * 0.35;
+    const rowColor = vs.maxDays >= 90 ? 'rgba(248,81,73,0.06)' : vs.maxDays >= 60 ? 'rgba(210,153,34,0.05)' : 'transparent';
+    const dayColor = vs.maxDays >= 60 ? 'var(--red)' : vs.maxDays >= 30 ? 'var(--amber)' : 'var(--green)';
+    const statusBadge = vs.hasAdvance
+      ? '<span class="kpi-badge" style="background:rgba(88,166,255,0.2);color:var(--blue);font-size:9px">⚡ ADVANCE</span>'
+      : vs.hasDue
+        ? '<span class="kpi-badge" style="background:rgba(248,81,73,0.2);color:var(--red);font-size:9px">🔴 DUE</span>'
+        : '<span class="kpi-badge badge-green" style="font-size:9px">SUBMITTED</span>';
+    thtml += `<tr style="background:${rowColor}">
+      <td class="mono-cell" style="color:var(--text-3);font-size:13px">${i+1}</td>
+      <td style="font-weight:700;font-size:13px;color:var(--text-1)">${vs.vendor}</td>
+      <td class="mono-cell" style="color:var(--blue)">${vs.lpoCount}</td>
+      <td class="mono-cell right" style="color:var(--red);font-weight:600">${formatQAR(vs.totalOut)}</td>
+      <td class="mono-cell right" style="color:var(--text-2)">${formatQAR(budget35)}</td>
+      <td class="mono-cell right" style="color:var(--green);font-weight:700;font-size:14px">${formatQAR(vs.monthlyAlloc)}</td>
+      <td style="text-align:center">
+        <div style="display:inline-flex;flex-direction:column;align-items:center;gap:3px">
+          <span style="font-size:14px;font-weight:700;color:var(--amber)">${allocPct}%</span>
+          <div style="width:60px;height:4px;background:var(--bg-hover);border-radius:2px;overflow:hidden">
+            <div style="width:${Math.min(allocPct,100)}%;height:100%;background:var(--green);border-radius:2px"></div>
+          </div>
+        </div>
+      </td>
+      <td class="mono-cell" style="color:${dayColor};font-weight:600">${vs.maxDays}d</td>
+      <td>${statusBadge}</td>
     </tr>`;
   });
 
+  // Total row
+  const top5Total = top5.reduce((s,v)=>s+v.monthlyAlloc,0);
+  const top5Out   = top5.reduce((s,v)=>s+v.totalOut,0);
   thtml += `<tr style="background:rgba(63,185,80,0.07);border-top:2px solid var(--green)">
-    <td colspan="9" style="font-weight:700;color:var(--green)">TOTAL MONTHLY RECOMMENDED (35% avg per vendor)</td>
-    <td class="mono-cell right" style="color:var(--green);font-weight:700">${formatQAR(totalRec)}</td>
-    <td colspan="2"></td></tr>`;
+    <td colspan="3" style="font-weight:700;color:var(--green)">TOP 5 VENDORS TOTAL</td>
+    <td class="mono-cell right" style="color:var(--red);font-weight:700">${formatQAR(top5Out)}</td>
+    <td class="mono-cell right" style="color:var(--text-2)">${formatQAR(top5Out*0.35)}</td>
+    <td class="mono-cell right" style="color:var(--green);font-weight:700;font-size:15px">${formatQAR(top5Total)}</td>
+    <td colspan="3"></td>
+  </tr>`;
   thtml += '</tbody></table>';
   document.getElementById('planner-table').innerHTML = thtml;
 
@@ -2269,8 +2322,8 @@ function exportCSV() {
   const now = new Date();
   const cutoff = new Date(now.getFullYear(), now.getMonth() - 2, 1);
   const allData = LPO_DATA.filter(r => {
-    if ((r.payment_status||'').toUpperCase() === 'PAID') return false;
-    if (r.invoice_status !== 'SUBMITTED') return false;
+    if (r.invoice_status !== 'SUBMITTED') return false;           // must be submitted
+    if ((r.payment_status||'').toUpperCase() === 'PAID') return false; // not paid
     if (!r.date_issued) return false;
     return new Date(r.date_issued) >= cutoff;
   });
