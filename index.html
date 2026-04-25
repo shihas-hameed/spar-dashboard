@@ -186,6 +186,19 @@ td.right{text-align:right}
 .week-items{font-size:11px;color:var(--text-2);margin-bottom:12px}
 .week-bar{height:4px;background:var(--bg-hover);border-radius:2px;overflow:hidden}
 .week-bar-fill{height:100%;border-radius:2px;transition:width 0.5s}
+.vendor-plan-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px}
+.vendor-plan-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.vendor-plan-name{font-size:14px;font-weight:700;color:var(--text-1)}
+.vendor-plan-meta{font-size:11px;color:var(--text-2);font-family:'IBM Plex Mono',monospace}
+.vendor-plan-bar{height:6px;background:var(--bg-hover);border-radius:3px;overflow:hidden;margin:8px 0}
+.vendor-plan-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--green),var(--amber))}
+.lpo-plan-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border);font-size:11px}
+.btn-add-plan{background:rgba(88,166,255,0.15);color:var(--blue);border:1px solid rgba(88,166,255,0.3);border-radius:4px;padding:3px 8px;font-size:10px;cursor:pointer;transition:all 0.15s;white-space:nowrap}
+.btn-add-plan:hover{background:rgba(88,166,255,0.3)}
+.btn-add-plan.added{background:rgba(63,185,80,0.15);color:var(--green);border-color:rgba(63,185,80,0.3)}
+.plan-month-selector{display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.plan-month-btn{background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;padding:5px 14px;font-size:11px;color:var(--text-2);cursor:pointer;transition:all 0.15s}
+.plan-month-btn.active{background:rgba(88,166,255,0.15);border-color:var(--blue);color:var(--blue);font-weight:600}
 
 /* TOOLTIP OVERRIDE */
 .tooltip-host{position:relative}
@@ -467,23 +480,31 @@ select{-webkit-appearance:none;appearance:none}
     <button class="btn-export" onclick="exportCSV()">📥 Export Plan as CSV</button>
     <button class="btn-export" onclick="window.print()">🖨️ Print View</button>
   </div>
+  <div class="plan-month-selector" id="plan-month-selector"></div>
   <div class="info-card">
-    <p><strong>Planner Logic:</strong> Two criteria are applied to each outstanding invoice and the higher recommended payment is used.<br>
-    <strong>Criterion A (Percentage-based):</strong> 35% of invoice value for "After Completion" terms · 40% for split-payment schedules · 35% default.<br>
-    <strong>Criterion B (Overdue Escalation):</strong> 31–60 days overdue → recommend 50% · 60+ days → recommend 100% immediate settlement · 0–30 days → 0%.<br>
-    <strong>Rule:</strong> Apply whichever criterion results in the HIGHER recommended payment.</p>
+    <p><strong>Planner Logic:</strong> Monthly allocation of <strong>30–40% of total outstanding per vendor</strong> (last 3 months, DUE status only, excludes PAID).<br>
+    <strong>⚡ Priority 1 — Advance:</strong> Payment Schedule = ADVANCE + DUE → always included at 100%.<br>
+    <strong>🔴 Priority 2 — Overdue 60–90 days:</strong> 100% recommended · <strong>🟠 Priority 3 — 15–30 days:</strong> 50% · <strong>🟡 Other:</strong> 30%.<br>
+    <strong>Monthly cap:</strong> Total recommended per vendor = 30–40% of their total outstanding. Use <em>+ Add to Plan</em> on any LPO row to manually include it.</p>
   </div>
   <div class="kpi-row kpi-row-4" id="planner-kpis"></div>
   <div class="table-card" style="margin-bottom:24px">
     <div class="table-header" style="display:flex;align-items:center;justify-content:space-between"><span class="table-title">Payment Plan</span><span id="planner-range-label" style="font-size:11px;color:var(--text-2);font-family:'IBM Plex Mono',monospace"></span></div>
     <div id="planner-table"></div>
   </div>
+  <div class="table-card" style="margin-bottom:24px">
+    <div class="table-header" style="display:flex;align-items:center;justify-content:space-between">
+      <span class="table-title">Vendor Monthly Allocation (30–40% of Outstanding)</span>
+      <span style="font-size:11px;color:var(--text-2)">Click <strong>+ Add to Plan</strong> on any LPO to manually include it</span>
+    </div>
+    <div id="vendor-plan-breakdown"></div>
+  </div>
   <div class="chart-card" style="margin-bottom:24px">
     <div class="chart-title">Recommended Payments by Vendor</div>
     <div class="chart-sub">Total outstanding vs recommended disbursement this cycle</div>
     <div class="chart-container-lg"><canvas id="chart-planner-vendor"></canvas></div>
   </div>
-  <div class="section-label">4-Week Disbursement Schedule</div>
+  <div class="section-label">Monthly Disbursement Schedule</div>
   <div class="week-plan" id="week-plan"></div>
 </div>
 
@@ -507,6 +528,8 @@ select{-webkit-appearance:none;appearance:none}
 </div>
 
 <script>
+// ── MANUAL PLAN STATE ──
+let manualPlanLPOs = new Set(); // lpo_no values manually added
 // ============================================================
 // FULL LPO DATA — 485 RECORDS
 // ============================================================
@@ -1759,142 +1782,303 @@ function calcPlannerRow(r) {
   const days = daysAgo(r.date_issued);
   const s = (r.payment_schedule||'').toUpperCase();
   const ps = (r.payment_status||'').toUpperCase();
-  // PRIORITY 1: Payment Schedule = ADVANCE AND Payment Status = DUE
   const isAdvance = s.includes('ADVANCE') && ps === 'DUE';
+  const isManual = manualPlanLPOs.has(r.lpo_no);
 
-  let recommended, basis, priority;
-
-  if (isAdvance) {
-    // Priority 1: Advance payment matched with DUE → 100% immediate
-    recommended = r.amount;
-    basis = '⚡ Advance + DUE — 100%';
+  let basePct, basis, priority;
+  if (isAdvance || isManual) {
+    basePct = 1.0; basis = isAdvance ? '⚡ Advance + DUE' : '✋ Manually Added';
     priority = 1;
   } else if (days >= 60) {
-    // Priority 2: Due more than 2–3 months (60–90 days) → 100%
-    recommended = r.amount;
-    basis = '🔴 Overdue 2–3 Months — 100%';
-    priority = 2;
+    basePct = 1.0; basis = '🔴 Overdue 60–90d'; priority = 2;
   } else if (days >= 15) {
-    // Priority 3: Due 15–30 days → 50%
-    recommended = r.amount * 0.50;
-    basis = '🟠 Due 15–30 Days — 50%';
-    priority = 3;
+    basePct = 0.50; basis = '🟠 Due 15–30d'; priority = 3;
   } else {
-    // Under 15 days → 30%
-    recommended = r.amount * 0.30;
-    basis = '🟡 Due <15 Days — 30%';
-    priority = 4;
+    basePct = 0.30; basis = '🟡 Due <15d'; priority = 4;
   }
-
-  const pct = recommended / r.amount * 100;
-  return {r, days, recommended, basis, pct, isAdvance, priority};
+  // Monthly cap: 30–40% of vendor total outstanding applied proportionally
+  // (cap applied at vendor level in renderPlanner, stored as capPct)
+  const recommended = r.amount * basePct;
+  const pct = basePct * 100;
+  return {r, days, recommended, basis, pct, isAdvance, isManual, priority, basePct};
 }
+function toggleManualPlan(lpo_no, btn) {
+  if (manualPlanLPOs.has(lpo_no)) {
+    manualPlanLPOs.delete(lpo_no);
+    btn.textContent = '+ Add to Plan';
+    btn.classList.remove('added');
+  } else {
+    manualPlanLPOs.add(lpo_no);
+    btn.textContent = '✓ In Plan';
+    btn.classList.add('added');
+  }
+  renderPlanner();
+}
+
 function renderPlanner() {
   const now = new Date();
-  const cutoff = new Date(now.getFullYear(), now.getMonth() - 2, 1); // first day of 3 months ago
-  const plannerData = getFilteredData().filter(r => {
-    // Exclude paid records
+  const cutoff = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+
+  // Base DUE data for last 3 months
+  const dueData = getFilteredData().filter(r => {
     if ((r.payment_status||'').toUpperCase() === 'PAID') return false;
-    // Only include DUE payment status (PENDING = invoice not yet submitted)
-    const isDue = (r.payment_status||'').toUpperCase() === 'DUE';
-    if (!isDue) return false;
-    // Within last 3 months
+    if ((r.payment_status||'').toUpperCase() !== 'DUE') return false;
     if (!r.date_issued) return true;
     return new Date(r.date_issued) >= cutoff;
   });
-  const rows = plannerData.map(calcPlannerRow).sort((a,b) => {
+
+  // All LPOs available for manual add (submitted, not paid, last 3 months)
+  const availableForPlan = getFilteredData().filter(r => {
+    if ((r.payment_status||'').toUpperCase() === 'PAID') return false;
+    if (r.invoice_status !== 'SUBMITTED') return false;
+    if (!r.date_issued) return false;
+    return new Date(r.date_issued) >= cutoff;
+  });
+
+  // Combine: DUE records + manually added
+  const manualAdded = availableForPlan.filter(r => manualPlanLPOs.has(r.lpo_no) && !dueData.find(d => d.lpo_no === r.lpo_no));
+  const plannerData = [...dueData, ...manualAdded];
+
+  // Build per-vendor totals for 30-40% cap
+  const vendorTotals = {};
+  plannerData.forEach(r => {
+    if (!vendorTotals[r.vendor]) vendorTotals[r.vendor] = 0;
+    vendorTotals[r.vendor] += r.amount;
+  });
+
+  // Calculate rows with vendor cap applied (30–40%)
+  const rows = plannerData.map(r => {
+    const calc = calcPlannerRow(r);
+    const vendorTotal = vendorTotals[r.vendor] || r.amount;
+    // Monthly allocation: 35% of vendor total outstanding (midpoint of 30-40%)
+    const monthlyAlloc = vendorTotal * 0.35;
+    // Cap individual recommended at their proportional share of monthly alloc
+    // Advance + overdue always get full recommended
+    let cappedRec = calc.recommended;
+    if (calc.priority >= 3) {
+      // Proportional share: (this LPO / vendor total) * monthly alloc
+      const share = (r.amount / vendorTotal) * monthlyAlloc;
+      cappedRec = Math.min(calc.recommended, share);
+    }
+    return {...calc, cappedRec, vendorTotal, monthlyAlloc};
+  }).sort((a,b) => {
     if (a.priority !== b.priority) return a.priority - b.priority;
     return b.days - a.days;
   });
+
   const totalOut = plannerData.reduce((a,b)=>a+b.amount,0);
-  const totalRec = rows.reduce((a,b)=>a+b.recommended,0);
+  const totalRec = rows.reduce((a,b)=>a+b.cappedRec,0);
   const advCount = rows.filter(r=>r.isAdvance).length;
   const overdueCount = rows.filter(r=>r.priority===2).length;
 
-  // Show date range label
+  // Date range label
   const lbl = document.getElementById('planner-range-label');
   if (lbl) {
     const from = cutoff.toLocaleDateString('en-QA',{month:'short',year:'numeric'});
     const to = now.toLocaleDateString('en-QA',{month:'short',year:'numeric'});
-    lbl.textContent = `Scope: ${from} – ${to} · Excludes PAID`;
+    lbl.textContent = `Scope: ${from} – ${to} · DUE only · Excludes PAID`;
   }
-  document.getElementById('planner-kpis').innerHTML = `
-    <div class="kpi-card"><div class="kpi-label">Invoices In Plan</div><div class="kpi-value mono">${plannerData.length}</div><div class="kpi-sub">DUE invoices (last 3 months)</div></div>
-    <div class="kpi-card"><div class="kpi-label">Recommended Outflow</div><div class="kpi-value mono" style="color:var(--amber);font-size:18px">${formatQAR(totalRec)}</div><div class="kpi-sub">This payment cycle</div></div>
-    <div class="kpi-card"><div class="kpi-label">⚡ Advance Priority</div><div class="kpi-value mono" style="color:var(--blue)">${advCount}</div><div class="kpi-sub">Advance + DUE match</div></div>
-    <div class="kpi-card"><div class="kpi-label">🔴 Overdue 2–3 Months</div><div class="kpi-value mono" style="color:var(--red)">${overdueCount}</div><div class="kpi-sub">60–90 days overdue</div></div>`;
 
-  let thtml = '<table><thead><tr><th>Priority</th><th>LPO #</th><th>Vendor</th><th>Store</th><th>Category</th><th>Payment Schedule</th><th>Invoice (QAR)</th><th>Days Out</th><th>Rec %</th><th>Rec Payment (QAR)</th><th>Basis</th><th>PO</th></tr></thead><tbody>';
-  rows.forEach(({r, days, recommended, basis, pct, isAdvance}) => {
-    const rowBg = isAdvance ? 'background:rgba(88,166,255,0.06);' : days>60 ? 'background:rgba(248,81,73,0.04);' : '';
+  // Month selector tabs
+  const months = [];
+  for (let i = 2; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({label: d.toLocaleDateString('en-QA',{month:'long',year:'numeric'}), month: d.getMonth(), year: d.getFullYear()});
+  }
+  const selEl = document.getElementById('plan-month-selector');
+  if (selEl) {
+    selEl.innerHTML = '<span style="font-size:11px;color:var(--text-2);margin-right:4px">Plan Month:</span>'
+      + months.map((m,i) => `<button class="plan-month-btn${i===2?' active':''}" onclick="this.parentElement.querySelectorAll('.plan-month-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')">${m.label}</button>`).join('');
+  }
+
+  // KPI cards
+  document.getElementById('planner-kpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Invoices In Plan</div><div class="kpi-value mono">${plannerData.length}</div><div class="kpi-sub">DUE + manually added</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Outstanding</div><div class="kpi-value mono" style="color:var(--blue);font-size:18px">${formatQAR(totalOut)}</div><div class="kpi-sub">All vendors combined</div></div>
+    <div class="kpi-card"><div class="kpi-label">Monthly Allocation</div><div class="kpi-value mono" style="color:var(--amber);font-size:18px">${formatQAR(totalRec)}</div><div class="kpi-sub">30–40% of outstanding</div></div>
+    <div class="kpi-card"><div class="kpi-label">⚡ Advance Priority</div><div class="kpi-value mono" style="color:var(--green)">${advCount}</div><div class="kpi-sub">Always included — 100%</div></div>`;
+
+  // Main plan table
+  let thtml = '<table><thead><tr><th>Priority</th><th>LPO #</th><th>Vendor</th><th>Store</th><th>Category</th><th>Payment Schedule</th><th>Invoice (QAR)</th><th>Days Out</th><th>Basis</th><th>Monthly Rec (QAR)</th><th>PO</th></tr></thead><tbody>';
+  rows.forEach(({r, days, cappedRec, basis, isAdvance, isManual, vendorTotal, monthlyAlloc}) => {
+    const capPct = (cappedRec / r.amount * 100).toFixed(0);
+    const rowBg = isAdvance ? 'background:rgba(88,166,255,0.07);' : isManual ? 'background:rgba(163,113,247,0.07);' : days>=60 ? 'background:rgba(248,81,73,0.05);' : '';
+    const badge = isAdvance
+      ? '<span class="kpi-badge" style="background:rgba(88,166,255,0.2);color:var(--blue);font-size:9px">⚡ P1 ADVANCE</span>'
+      : isManual
+        ? '<span class="kpi-badge" style="background:rgba(163,113,247,0.2);color:#A371F7;font-size:9px">✋ P1 MANUAL</span>'
+        : priorityLabel(days);
     thtml += `<tr style="${rowBg}">
-      <td>${isAdvance ? '<span class="kpi-badge" style="background:rgba(88,166,255,0.2);color:var(--blue);font-size:9px">⚡ ADVANCE</span>' : priorityLabel(days)}</td>
+      <td>${badge}</td>
       <td class="mono-cell" style="color:var(--blue)">${r.lpo_no}</td>
       <td style="font-weight:500">${r.vendor}</td>
       <td><span class="kpi-badge badge-blue">${r.store}</span></td>
       <td style="font-size:11px;color:var(--text-2)">${r.category}</td>
       <td style="font-size:10px;color:var(--text-2)">${r.payment_schedule||'—'}</td>
       <td class="mono-cell right">${formatQAR(r.amount)}</td>
-      <td class="mono-cell" style="color:${days>30?'var(--red)':'var(--text-1)'}">${days}</td>
-      <td class="mono-cell" style="color:var(--amber);font-weight:600">${pct.toFixed(0)}%</td>
-      <td class="mono-cell right" style="color:var(--green);font-weight:600">${formatQAR(recommended)}</td>
+      <td class="mono-cell" style="color:${days>=60?'var(--red)':days>=15?'var(--amber)':'var(--text-1)'}">${days}d</td>
       <td style="font-size:10px;color:var(--text-2)">${basis}</td>
-      <td>${r.po_link?`<a href="${r.po_link}" target="_blank" class="action-btn primary" style="font-size:10px">Open</a>`:'—'}</td>
+      <td class="mono-cell right" style="color:var(--green);font-weight:700">${formatQAR(cappedRec)} <span style="font-size:10px;color:var(--text-3)">(${capPct}%)</span></td>
+      <td>${r.po_link?`<a href="${r.po_link}" target="_blank" class="action-btn primary" style="font-size:10px">PO</a>`:'—'}</td>
     </tr>`;
   });
-  thtml += `<tr style="background:rgba(63,185,80,0.06);border-top:2px solid var(--green)"><td colspan="8" style="font-weight:700;color:var(--green)">TOTAL RECOMMENDED</td><td class="mono-cell right" style="color:var(--green);font-weight:700">${formatQAR(totalRec)}</td><td colspan="2"></td></tr>`;
+  thtml += `<tr style="background:rgba(63,185,80,0.07);border-top:2px solid var(--green)">
+    <td colspan="9" style="font-weight:700;color:var(--green)">TOTAL MONTHLY RECOMMENDED (30–40% cap)</td>
+    <td class="mono-cell right" style="color:var(--green);font-weight:700">${formatQAR(totalRec)}</td>
+    <td></td></tr>`;
   thtml += '</tbody></table>';
   document.getElementById('planner-table').innerHTML = thtml;
 
-  // Vendor grouped bar
+  // ── Vendor breakdown with + Add to Plan ──
+  const vGroups = {};
+  plannerData.forEach(r => {
+    if (!vGroups[r.vendor]) vGroups[r.vendor] = {lpos:[], total:0, recTotal:0};
+    vGroups[r.vendor].lpos.push(r);
+    vGroups[r.vendor].total += r.amount;
+  });
+  rows.forEach(({r, cappedRec}) => {
+    if (vGroups[r.vendor]) vGroups[r.vendor].recTotal += cappedRec;
+  });
+
+  // Add available (submitted, not yet in plan) LPOs per vendor for manual add
+  const availByVendor = {};
+  availableForPlan.filter(r => !dueData.find(d=>d.lpo_no===r.lpo_no) && !manualPlanLPOs.has(r.lpo_no)).forEach(r => {
+    if (!availByVendor[r.vendor]) availByVendor[r.vendor] = [];
+    availByVendor[r.vendor].push(r);
+  });
+
+  let vhtml = '';
+  Object.entries(vGroups).sort((a,b)=>b[1].recTotal-a[1].recTotal).forEach(([vname, vdata]) => {
+    const allocPct = vdata.total > 0 ? (vdata.recTotal/vdata.total*100).toFixed(0) : 0;
+    const barW = Math.min(allocPct, 100);
+    const barColor = allocPct >= 35 ? 'var(--green)' : 'var(--amber)';
+    vhtml += `<div class="vendor-plan-card">
+      <div class="vendor-plan-header">
+        <div>
+          <div class="vendor-plan-name">${vname}</div>
+          <div class="vendor-plan-meta">${vdata.lpos.length} invoice${vdata.lpos.length!==1?'s':''} · Outstanding: ${formatQAR(vdata.total)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:18px;font-weight:700;color:var(--green);font-family:'IBM Plex Mono',monospace">${formatQAR(vdata.recTotal)}</div>
+          <div style="font-size:10px;color:var(--text-2)">Monthly allocation · ${allocPct}% of outstanding</div>
+        </div>
+      </div>
+      <div class="vendor-plan-bar"><div class="vendor-plan-bar-fill" style="width:${barW}%;background:${barColor}"></div></div>`;
+
+    // Show each LPO in plan
+    vdata.lpos.forEach(r => {
+      const calc = rows.find(row=>row.r.lpo_no===r.lpo_no);
+      const rec = calc ? calc.cappedRec : 0;
+      const isAdv = (r.payment_schedule||'').toUpperCase().includes('ADVANCE');
+      const isMnl = manualPlanLPOs.has(r.lpo_no);
+      const daysr = daysAgo(r.date_issued);
+      vhtml += `<div class="lpo-plan-row">
+        <span class="mono-cell" style="color:var(--blue);min-width:44px">${r.lpo_no}</span>
+        <span style="flex:1;color:var(--text-2)">${r.description||r.category}</span>
+        <span style="color:var(--text-3);min-width:50px">${daysr}d old</span>
+        <span style="color:var(--text-1);min-width:80px;text-align:right">${formatQAR(r.amount)}</span>
+        <span style="color:var(--green);font-weight:600;min-width:80px;text-align:right">${formatQAR(rec)}</span>
+        ${isAdv ? '<span class="kpi-badge" style="background:rgba(88,166,255,0.2);color:var(--blue);font-size:9px">⚡ ADV</span>' : ''}
+        ${isMnl ? '<button class="btn-add-plan added" onclick="toggleManualPlan('+r.lpo_no+',this)">✓ In Plan</button>' : ''}
+      </div>`;
+    });
+
+    // Show available LPOs to add manually
+    if (availByVendor[vname] && availByVendor[vname].length > 0) {
+      vhtml += `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border)">
+        <div style="font-size:10px;color:var(--text-3);margin-bottom:4px">Available to add from this vendor:</div>`;
+      availByVendor[vname].slice(0,5).forEach(r => {
+        const daysr = daysAgo(r.date_issued);
+        vhtml += `<div class="lpo-plan-row">
+          <span class="mono-cell" style="color:var(--text-3);min-width:44px">${r.lpo_no}</span>
+          <span style="flex:1;color:var(--text-3)">${r.description||r.category}</span>
+          <span style="color:var(--text-3);min-width:50px">${daysr}d old</span>
+          <span style="color:var(--text-2);min-width:80px;text-align:right">${formatQAR(r.amount)}</span>
+          <span style="min-width:80px"></span>
+          <button class="btn-add-plan" onclick="toggleManualPlan(${r.lpo_no},this)">+ Add to Plan</button>
+        </div>`;
+      });
+      if (availByVendor[vname].length > 5) {
+        vhtml += `<div style="font-size:10px;color:var(--text-3);padding:4px 0">+ ${availByVendor[vname].length-5} more LPOs available</div>`;
+      }
+      vhtml += '</div>';
+    }
+    vhtml += '</div>';
+  });
+
+  // Also show vendors with available LPOs but not in plan
+  Object.entries(availByVendor).filter(([v]) => !vGroups[v]).forEach(([vname, lpos]) => {
+    vhtml += `<div class="vendor-plan-card" style="opacity:0.7">
+      <div class="vendor-plan-header">
+        <div><div class="vendor-plan-name" style="color:var(--text-2)">${vname}</div>
+        <div class="vendor-plan-meta">${lpos.length} submitted invoice${lpos.length!==1?'s':''} available to add</div></div>
+        <div style="font-size:10px;color:var(--text-3)">Not in current plan</div>
+      </div>`;
+    lpos.slice(0,3).forEach(r => {
+      const daysr = daysAgo(r.date_issued);
+      vhtml += `<div class="lpo-plan-row">
+        <span class="mono-cell" style="color:var(--text-3);min-width:44px">${r.lpo_no}</span>
+        <span style="flex:1;color:var(--text-3)">${r.description||r.category}</span>
+        <span style="color:var(--text-3);min-width:50px">${daysr}d old</span>
+        <span style="color:var(--text-2);min-width:80px;text-align:right">${formatQAR(r.amount)}</span>
+        <span style="min-width:80px"></span>
+        <button class="btn-add-plan" onclick="toggleManualPlan(${r.lpo_no},this)">+ Add to Plan</button>
+      </div>`;
+    });
+    vhtml += '</div>';
+  });
+
+  document.getElementById('vendor-plan-breakdown').innerHTML = vhtml || '<div style="padding:20px;color:var(--text-3);text-align:center">No DUE invoices in the last 3 months</div>';
+
+  // Vendor chart
   const vendorMap = {};
-  rows.forEach(({r,recommended}) => {
+  rows.forEach(({r,cappedRec}) => {
     if (!vendorMap[r.vendor]) vendorMap[r.vendor] = {total:0,rec:0};
     vendorMap[r.vendor].total += r.amount;
-    vendorMap[r.vendor].rec += recommended;
+    vendorMap[r.vendor].rec += cappedRec;
   });
   const sortedV = Object.entries(vendorMap).sort((a,b)=>b[1].rec-a[1].rec);
   destroyChart('chart-planner-vendor');
-  const ctx = document.getElementById('chart-planner-vendor').getContext('2d');
-  charts['chart-planner-vendor'] = new Chart(ctx, {
-    type:'bar',
-    data:{
-      labels:sortedV.map(([n])=>n),
-      datasets:[
-        {label:'Total Outstanding',data:sortedV.map(([,v])=>v.total),backgroundColor:'#58A6FF44',borderColor:'#58A6FF',borderWidth:1},
-        {label:'Recommended Payment',data:sortedV.map(([,v])=>v.rec),backgroundColor:'#3FB95099',borderColor:'#3FB950',borderWidth:1}
-      ]
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{labels:{color:'#8B949E',font:{family:'Sora',size:11}}},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+formatQAR(ctx.raw)}}},
-      scales:{
-        x:{ticks:{color:'#8B949E',font:{size:11}},grid:{color:'#21262D'}},
-        y:{ticks:{color:'#8B949E',font:{size:10},callback:v=>'QAR '+v.toLocaleString()},grid:{color:'#21262D'}}
+  if (sortedV.length) {
+    const ctx = document.getElementById('chart-planner-vendor').getContext('2d');
+    charts['chart-planner-vendor'] = new Chart(ctx, {
+      type:'bar',
+      data:{
+        labels:sortedV.map(([n])=>n),
+        datasets:[
+          {label:'Total Outstanding',data:sortedV.map(([,v])=>v.total),backgroundColor:'#58A6FF44',borderColor:'#58A6FF',borderWidth:1},
+          {label:'Monthly Allocation (30–40%)',data:sortedV.map(([,v])=>v.rec),backgroundColor:'#3FB95099',borderColor:'#3FB950',borderWidth:1}
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#8B949E',font:{family:'Sora',size:11}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+formatQAR(c.raw)}}},
+        scales:{
+          x:{ticks:{color:'#8B949E',font:{size:11}},grid:{color:'#21262D'}},
+          y:{ticks:{color:'#8B949E',font:{size:10},callback:v=>'QAR '+v.toLocaleString()},grid:{color:'#21262D'}}
+        }
       }
-    }
-  });
+    });
+  }
 
-  // Week plan
-  const week1 = rows.filter(r=>r.days>60);
-  const week2 = rows.filter(r=>r.days>30&&r.days<=60);
-  const week34 = rows.filter(r=>r.days<=30);
-  const w1sum = week1.reduce((a,b)=>a+b.recommended,0);
-  const w2sum = week2.reduce((a,b)=>a+b.recommended,0);
-  const w3sum = week34.slice(0,Math.ceil(week34.length/2)).reduce((a,b)=>a+b.recommended,0);
-  const w4sum = week34.slice(Math.ceil(week34.length/2)).reduce((a,b)=>a+b.recommended,0);
-  const wTotal = w1sum+w2sum+w3sum+w4sum;
-  const weekData = [
-    {label:'Week 1',color:'var(--red)',amount:w1sum,items:week1.length,note:'URGENT — 60+ days overdue'},
-    {label:'Week 2',color:'var(--orange)',amount:w2sum,items:week2.length,note:'HIGH — 31–60 days'},
-    {label:'Week 3',color:'var(--amber)',amount:w3sum,items:Math.ceil(week34.length/2),note:'PLAN — Phase 1'},
-    {label:'Week 4',color:'var(--green)',amount:w4sum,items:week34.length-Math.ceil(week34.length/2),note:'PLAN — Phase 2'}
+  // Monthly disbursement schedule
+  const p1 = rows.filter(r=>r.priority===1);
+  const p2 = rows.filter(r=>r.priority===2);
+  const p3 = rows.filter(r=>r.priority===3);
+  const p4 = rows.filter(r=>r.priority===4);
+  const sum = arr => arr.reduce((a,b)=>a+b.cappedRec,0);
+  const wTotal = sum(rows);
+  const monthData = [
+    {label:'Priority 1',color:'var(--blue)',amount:sum(p1),items:p1.length,note:'Advance + Manually Added'},
+    {label:'Priority 2',color:'var(--red)',amount:sum(p2),items:p2.length,note:'Overdue 60–90 Days — 100%'},
+    {label:'Priority 3',color:'var(--amber)',amount:sum(p3),items:p3.length,note:'Due 15–30 Days — 50%'},
+    {label:'Priority 4',color:'var(--green)',amount:sum(p4),items:p4.length,note:'Due <15 Days — 30%'}
   ];
-  document.getElementById('week-plan').innerHTML = weekData.map(w => `
+  document.getElementById('week-plan').innerHTML = monthData.map(w => `
     <div class="week-card">
       <div class="week-label" style="color:${w.color}">${w.label} · ${w.note}</div>
       <div class="week-amount">${formatQAR(w.amount)}</div>
-      <div class="week-items">${w.items} invoice${w.items!==1?'s':''} to settle</div>
+      <div class="week-items">${w.items} invoice${w.items!==1?'s':''}</div>
       <div class="week-bar"><div class="week-bar-fill" style="width:${wTotal?((w.amount/wTotal)*100).toFixed(0):0}%;background:${w.color}"></div></div>
     </div>`).join('');
 }
@@ -1905,14 +2089,16 @@ function renderPlanner() {
 function exportCSV() {
   const now = new Date();
   const cutoff = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-  const pending = LPO_DATA.filter(r => {
-    if (r.invoice_status !== 'PENDING') return false;
+  const dueData = LPO_DATA.filter(r => {
+    if ((r.payment_status||'').toUpperCase() === 'PAID') return false;
+    if ((r.payment_status||'').toUpperCase() !== 'DUE') return false;
     if (!r.date_issued) return true;
     return new Date(r.date_issued) >= cutoff;
   });
-  const rows = pending.map(calcPlannerRow).sort((a,b) => {
-    if (a.isAdvance && !b.isAdvance) return -1;
-    if (!a.isAdvance && b.isAdvance) return 1;
+  const manualData = LPO_DATA.filter(r => manualPlanLPOs.has(r.lpo_no) && !dueData.find(d=>d.lpo_no===r.lpo_no));
+  const plannerData = [...dueData, ...manualData];
+  const rows = plannerData.map(calcPlannerRow).sort((a,b) => {
+    if (a.priority !== b.priority) return a.priority - b.priority;
     return b.days - a.days;
   });
   const headers = ['Priority','LPO #','Vendor','Store','Category','Payment Schedule','Description','Invoice QAR','Days Outstanding','Recommended %','Recommended QAR','Basis','Date Issued'];
