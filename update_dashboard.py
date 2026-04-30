@@ -19,7 +19,7 @@ from datetime import datetime
 # ─────────────────────────────────────────────────────────────
 #  ⚙️  CONFIGURATION — only edit these 3 lines
 # ─────────────────────────────────────────────────────────────
-EXCEL_FILE  = r"C:\Users\shameed\Documents\LPO_Number.xlsx"
+EXCEL_FILE  = r"C:\Users\shameed\Documents\spar-dashboard\LPO_Number.xlsx"
 GITHUB_REPO = r"C:\Users\shameed\Documents\spar-dashboard"
 SHEET_NAME  = "LPO TRACKING"
 # ─────────────────────────────────────────────────────────────
